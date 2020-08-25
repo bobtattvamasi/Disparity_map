@@ -7,8 +7,8 @@ from point_cloud import stereo_depth_map as depth_map, create_points_cloud
 from abc import ABC, abstractmethod
 import subprocess
 import math
-import picamera
-from picamera import PiCamera
+# import picamera
+# from picamera import PiCamera
 import numpy as np
 from measurements_values import defaultValues
 import string
@@ -54,29 +54,29 @@ class Interface(baseInterface):
 
 		# Список имен изображений, индекс-указатель на определенное
 		# изображение
-		#self.imageToDisp, self.index = self.image_to_disp(defaultValues.folderTestScenes)
+		self.imageToDisp, self.index = self.image_to_disp(defaultValues.folderTestScenes)
 		
 		# Camera settimgs
 		self.cam_width = 2560
 		self.cam_height = 720
 		# Final image capture settings
-		scale_ratio = 1
-		# Camera resolution height must be dividable by 16, and width by 32
-		cam_width = int((self.cam_width+31)/32)*32
-		cam_height = int((self.cam_height+15)/16)*16
-		print ("Camera resolution: "+str(cam_width)+" x "+str(cam_height))
+		# scale_ratio = 1
+		# # Camera resolution height must be dividable by 16, and width by 32
+		# cam_width = int((self.cam_width+31)/32)*32
+		# cam_height = int((self.cam_height+15)/16)*16
+		# print ("Camera resolution: "+str(cam_width)+" x "+str(cam_height))
 
-		# Buffer for captured image settings
-		self.img_width = int (cam_width * scale_ratio)
-		self.img_height = int (cam_height * scale_ratio)
-		self.capture = np.zeros((self.img_height, self.img_width, 4), dtype=np.uint8)
-		print ("Scaled image resolution: "+str(self.img_width)+" x "+str(self.img_height))
+		# # Buffer for captured image settings
+		# self.img_width = int (cam_width * scale_ratio)
+		# self.img_height = int (cam_height * scale_ratio)
+		# self.capture = np.zeros((self.img_height, self.img_width, 4), dtype=np.uint8)
+		# print ("Scaled image resolution: "+str(self.img_width)+" x "+str(self.img_height))
 
-		# Initialize the camera
-		self.camera = PiCamera(stereo_mode='side-by-side',stereo_decimate=False)
-		self.camera.resolution=(cam_width, cam_height)
-		self.camera.framerate = 20
-		self.camera.hflip = True
+		# # Initialize the camera
+		# self.camera = PiCamera(stereo_mode='side-by-side',stereo_decimate=False)
+		# self.camera.resolution=(cam_width, cam_height)
+		# self.camera.framerate = 20
+		# self.camera.hflip = True
 		#self.vs = PiVideoStream(resolution=(self.cam_width,self.cam_height)).start()
 		self.parameters = {}
 		#try:
@@ -369,7 +369,7 @@ class Interface(baseInterface):
 	# Основная функция в котором работает наше окно
 	def run(self):
 		# Двойное изображение
-		# imageToDisp = self.imageToDisp[self.index]
+		imageToDisp = self.imageToDisp[self.index]
 
 		# Создаем словарь параметров для настройки карты глубины,
 		# коорые ниже можно будет регулировать через ползунки.
@@ -385,8 +385,8 @@ class Interface(baseInterface):
 				# ~ }
 
 		# Калибровка и разделение изображений на левое и правое
-		# ~ imgL, imgR = calibrate_two_images(imageToDisp)
-		# ~ rectified_pair = (imgL, imgR)
+		imgL, imgR = calibrate_two_images(imageToDisp)
+		rectified_pair = (imgL, imgR)
 
 		# Флаг для перерисовывания графа(для возможности рисовать на нем)
 		a_id = None
@@ -403,8 +403,8 @@ class Interface(baseInterface):
 		
 
 		# The PSG "Event Loop"
-		for frame in self.camera.capture_continuous(self.capture, format="bgra", use_video_port=True, resize=(self.cam_width,self.cam_height)):                     
-		# while True:
+		#for frame in self.camera.capture_continuous(self.capture, format="bgra", use_video_port=True, resize=(self.cam_width,self.cam_height)):                     
+		while True:
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
 
 			if event is None or event == self.sg.WIN_CLOSED or event == 'Cancel':  
@@ -412,7 +412,7 @@ class Interface(baseInterface):
 			#imageToDisp = self.vs.read()
 			#cv2.imwrite("thread_pic.jpg", imageToDisp)
 			#frame =cv2.imread(imageToDisp)
-			imageToDisp = frame
+			#imageToDisp = frame
 			#imgLeft = frame [0:362,0:640]
 			#print(f"frame = {imageToDisp.shape}")
 			# ~ leftI = frame[0:720, 0:1280]
@@ -448,14 +448,14 @@ class Interface(baseInterface):
 				# ~ imgL, imgR = calibrate_two_images(imageToDisp)
 				# ~ rectified_pair = ( imgL, imgR)
 				
-				self.parameters['SpklWinSze'] = int(values[0])
-				self.parameters['SpcklRng'] = int(values[1])
-				self.parameters['UnicRatio'] = int(values[2])
-				self.parameters['TxtrThrshld'] = int(values[3])
-				self.parameters['NumOfDisp'] = int(values[4]/16)*16
-				self.parameters['MinDISP'] = int(values[5])
-				self.parameters['PreFiltCap'] = int(values[6]/2)*2+1
-				self.parameters['PFS'] = int(values[7]/2)*2+1
+				# self.parameters['SpklWinSze'] = int(values[0])
+				# self.parameters['SpcklRng'] = int(values[1])
+				# self.parameters['UnicRatio'] = int(values[2])
+				# self.parameters['TxtrThrshld'] = int(values[3])
+				# self.parameters['NumOfDisp'] = int(values[4]/16)*16
+				# self.parameters['MinDISP'] = int(values[5])
+				# self.parameters['PreFiltCap'] = int(values[6]/2)*2+1
+				# self.parameters['PFS'] = int(values[7]/2)*2+1
 				#parameters['SWS'] = int(values[8]/2)*2+1
 
 				# minVal = int(values[9])
@@ -463,6 +463,7 @@ class Interface(baseInterface):
 				# layer  = int(values[11])
 
 				#disparity, value_disparity = stereo_depth_map(rectified_pair, self.parameters)
+				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 				
 				if event == 'find lines':
 					try:
@@ -508,6 +509,8 @@ class Interface(baseInterface):
 
 			# Обработчики событий
 			# ---------------------
+
+
 			
 			# Save settings to file
 			if event == 'save settings':
@@ -560,52 +563,56 @@ class Interface(baseInterface):
 			#print(lines)
 			
 			if event == 'create map':
-				imgL, imgR = calibrate_two_images(imageToDisp)
-				rectified_pair = (imgL, imgR)
+				# imgL, imgR = calibrate_two_images(imageToDisp)
+				# rectified_pair = (imgL, imgR)
 				
-				self.parameters['SpklWinSze'] = int(values[0])
-				self.parameters['SpcklRng'] = int(values[1])
-				self.parameters['UnicRatio'] = int(values[2])
-				self.parameters['TxtrThrshld'] = int(values[3])
-				self.parameters['NumOfDisp'] = int(values[4]/16)*16
-				self.parameters['MinDISP'] = int(values[5])
-				self.parameters['PreFiltCap'] = int(values[6]/2)*2+1
-				self.parameters['PFS'] = int(values[7]/2)*2+1
-				#parameters['SWS'] = int(values[8]/2)*2+1
+				# self.parameters['SpklWinSze'] = int(values[0])
+				# self.parameters['SpcklRng'] = int(values[1])
+				# self.parameters['UnicRatio'] = int(values[2])
+				# self.parameters['TxtrThrshld'] = int(values[3])
+				# self.parameters['NumOfDisp'] = int(values[4]/16)*16
+				# self.parameters['MinDISP'] = int(values[5])
+				# self.parameters['PreFiltCap'] = int(values[6]/2)*2+1
+				# self.parameters['PFS'] = int(values[7]/2)*2+1
 
-				# minVal = int(values[9])
-				# maxVal = int(values[10])
-				# layer  = int(values[11])
-
-				disparity, value_disparity = stereo_depth_map(rectified_pair, self.parameters)
+				# disparity, value_disparity = stereo_depth_map(rectified_pair, self.parameters)
+				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 
 			# Нажатие на кнопку "Вычислить", которая должна вернуть 
-			# наименования граней и их размеры.
+			# наименования граней и их размеры(Для линий которые мы сами нарисовали).
 			if event == 'find length':
-				# Вычисляется облако точек
-				
-				
-				# Нахождение на карте глубин границ и отображение их
-				#disparity = contours_finder(disparity, minVal, maxVal, layer, -1)
+				try:
+					for i in range(len(lines)):
+						if lines[i] == None:
+							del lines[i]
+						elif lines[i][0] == None or lines[i][1] == None:
+							del lines[i]
+					#print(f"lines2 = {lines}")
+					
+					self.window.FindElement("_output_").Update('')
+					
+					for i,line in enumerate(lines):
+						#line_size = self.determine_line(value_disparity, line)
+						line_size = self.straight_determine_line(line)
+						print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
+				except:
+					print("find length dont work")
+					print(traceback.format_exc())
 
+	def deepMap_updater(self,imageToDisp, values):
+		imgL, imgR = calibrate_two_images(imageToDisp)
+		rectified_pair = (imgL, imgR)
+		
+		self.parameters['SpklWinSze'] = int(values[0])
+		self.parameters['SpcklRng'] = int(values[1])
+		self.parameters['UnicRatio'] = int(values[2])
+		self.parameters['TxtrThrshld'] = int(values[3])
+		self.parameters['NumOfDisp'] = int(values[4]/16)*16
+		self.parameters['MinDISP'] = int(values[5])
+		self.parameters['PreFiltCap'] = int(values[6]/2)*2+1
+		self.parameters['PFS'] = int(values[7]/2)*2+1
 
-				
-				
-				
-				#print(f"lines1 = {lines}")
-				for i in range(len(lines)):
-					if lines[i] == None:
-						del lines[i]
-					elif lines[i][0] == None or lines[i][1] == None:
-						del lines[i]
-				#print(f"lines2 = {lines}")
-				
-				self.window.FindElement("_output_").Update('')
-				
-				for i,line in enumerate(lines):
-					#line_size = self.determine_line(value_disparity, line)
-					line_size = self.straight_determine_line(line)
-					print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
+		return stereo_depth_map(rectified_pair, self.parameters)
 
 	def determine_line(self, disparity_map, line, baseline=0.065, focal=1442, rescale=1):
 		A = line[0]

@@ -5,8 +5,9 @@ import base64
 
 import cv2
 import numpy as np
-import imutils
+#import imutils
 # from death_map import *
+from measurements_values import defaultValues
 
 # Функция для отображения картинок на фронте
 def convert_to_bytes(file_or_bytes, resize=None):
@@ -41,26 +42,32 @@ def convert_to_bytes(file_or_bytes, resize=None):
 
 # Функция калибрует два изображения, разделяет их и эти два возвращает
 def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
-	photo_width = 3840
-	photo_height = 1088
-	image_width = 1920
-	image_height = 1088
-
+	# Определяем размеры(ширина,высота) сдвоенного изображения со стереокамеры и
+	# разделенных левого и правого.
+	photo_width = defaultValues.PHOTO_WIDTH
+	photo_height = defaultValues.PHOTO_HEIGHT
+	image_width = defaultValues.IMAGE_WIDTH
+	image_height = defaultValues.IMAGE_HEIGHT
 	image_size = (image_width,image_height)
+
+	# Cчитываем стерео-изображение
+	# if we from PiCamera
+	#pair_img = cv2.cvtColor(imageToDisp,cv2.COLOR_BGR2GRAY)
+	# If we from pictures
 	pair_img = cv2.imread(imageToDisp,0)
-	print('Read and split image...')
+
+	# Разделяем на левое и правое
 	imgLeft = pair_img [0:photo_height,0:image_width] #Y+H and X+W
 	imgRight = pair_img [0:photo_height,image_width:photo_width] #Y+H and X+W
 
-	# Implementing calibration data
-	print('Read calibration data and rectifying stereo pair...')
-
+	# Загружаем калибровочные данные
 	try:
 		npzfile = np.load('./data/calibration_data/{}p/stereo_camera_calibration.npz'.format(image_height))
 	except:
-		print("Camera calibration data not found in cache, file " & './data/calibration_data/{}p/stereo_camera_calibration.npz'.format(480))
+		print("Camera calibration data not found in cache, file " & './data/calibration_data/{}p/stereo_camera_calibration.npz'.format(image_height))
 		exit(0)
 
+	# Параметры калибровки
 	imageSize = tuple(npzfile['imageSize'])
 	leftMapX = npzfile['leftMapX']
 	leftMapY = npzfile['leftMapY']
@@ -73,47 +80,53 @@ def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
 	if 0 in [width_left, height_left, width_right, height_right]:
 		print("Error: Can't remap image.")
 
+	# Трансформация левого иправого изображения с помощью матриц калибровки
 	imgL = cv2.remap(imgLeft, leftMapX, leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 	imgR = cv2.remap(imgRight, rightMapX, rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
 	imgRs = cv2.resize (imgR, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
 	imgLs = cv2.resize (imgL, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+	#print(f"left = {imgLs.shape}, right = {imgRs.shape}")
 
-	# cv2.imshow("right", imgRs)
-	# cv2.imshow("left", imgLs)
-	cv2.waitKey(0)
+	#cv2.imshow("right", imgRs)
+	#cv2.imshow("left", imgLs)
+	#cv2.waitKey(0)
 	return imgLs, imgRs
 
 # Функция возвращает карту шлубин по калиброванным стереофото
 def stereo_depth_map(rectified_pair, parameters, ifsave=True):
-	SPWS = parameters['SpklWinSze']
-	PFS = parameters['PFS']
-	PFC = parameters['PreFiltCap']
-	MDS = parameters['MinDISP']
-	NOD = parameters['NumOfDisp']
-	TTH = parameters['TxtrThrshld']
-	UR = parameters['UnicRatio']
-	SR = parameters['SpcklRng']
-	SWS = parameters['SWS']
-
+	#SPWS = parameters['SpklWinSze']
+	#PFS = parameters['PFS']
+	#PFC = parameters['PreFiltCap']
+	#MDS = parameters['MinDISP']
+	#NOD = parameters['NumOfDisp']
+	#TTH = parameters['TxtrThrshld']
+	#UR = parameters['UnicRatio']
+	#SR = parameters['SpcklRng']
+	#SWS = parameters['SWS']
+	
+	#print(f"r,c = {rectified_pair[0].shape}")
 	c, r = rectified_pair[0].shape
-	disparity = np.zeros((c, r), np.uint8)
+	disparity = np.zeros((c,r), np.uint8)
 	sbm = cv2.StereoBM_create(numDisparities=16, blockSize=15)
 	sbm.setPreFilterType(1)
-	sbm.setPreFilterSize(PFS)
-	sbm.setPreFilterCap(PFC)
-	sbm.setMinDisparity(MDS)
-	sbm.setNumDisparities(NOD)
-	sbm.setTextureThreshold(TTH)
-	sbm.setUniquenessRatio(UR)
-	sbm.setSpeckleRange(SR)
-	sbm.setSpeckleWindowSize(SPWS)
+	sbm.setPreFilterSize(parameters['PFS'])
+	sbm.setPreFilterCap(parameters['PreFiltCap'])
+	sbm.setMinDisparity(parameters['MinDISP'])
+	sbm.setNumDisparities(parameters['NumOfDisp'])
+	sbm.setTextureThreshold(parameters['TxtrThrshld'])
+	sbm.setUniquenessRatio(parameters['UnicRatio'])
+	sbm.setSpeckleRange(parameters['SpcklRng'])
+	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])
 	dmLeft = rectified_pair[0]
 	dmRight = rectified_pair[1]
 	disparity = sbm.compute(dmLeft, dmRight)
+	#print(f"disparity.shape = {disparity.shape}")
+	value_disparity= disparity
 	#disparity_visual = cv.CreateMat(c, r, cv.CV_8U)
 	local_max = disparity.max()
 	local_min = disparity.min()
+	#print(f"min = {local_min},max = {local_max}")
 	# print ("MAX " + str(local_max))
 	# print ("MIN " + str(local_min))
 	disparity_visual = (disparity-local_min)*(1.0/(local_max-local_min))
@@ -132,7 +145,7 @@ def stereo_depth_map(rectified_pair, parameters, ifsave=True):
 	#cv.Normalize(disparity, disparity_visual, 0, 255, cv.CV_MINMAX)
 	#disparity_visual = np.array(disparity_visual)
 	disparity_visual = cv2.resize (disparity_visual, dsize=(960, 543), interpolation = cv2.INTER_CUBIC)
-	return disparity_color
+	return disparity_color, value_disparity
 
 # Функция находит границы объекта на карте глубин изображении
 def contours_finder(img, minVal, maxVal, layer, index):
@@ -158,7 +171,11 @@ def contours_finder(img, minVal, maxVal, layer, index):
 		# if contour_area < 25:
 		screenCnt.append(approx)
 	layer = layer - 1
-	img= cv2.drawContours(img, screenCnt, layer, (0, 255,0), 2, cv2.LINE_AA, hierarchy, 0)
+	#hierarchy = []
+
+	if len(img.shape) == 2 :
+		img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+	img= cv2.drawContours(img, screenCnt, -1, (0, 255,0), 2)
 
 	# cv2.imshow("edges", edges)
 	# cv2.imshow("img", img)

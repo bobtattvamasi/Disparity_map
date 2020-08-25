@@ -1,6 +1,9 @@
-from interface import Interface
+from interface_no_pi import Interface
 
-interbox = Interface("DarkAmber", 'Demo Determine Dimensions')
+def main():
+	interbox = Interface("DarkAmber", 'Demo Determine Line Lenght')
+	interbox.run()
+	interbox.close()
 
-interbox.run()
-interbox.close()
+if __name__ == '__main__':
+	main()
