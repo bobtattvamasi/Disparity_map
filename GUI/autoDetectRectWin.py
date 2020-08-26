@@ -33,7 +33,7 @@ class autoDetectRectWin(baseInterface):
 			[self.sg.Text("Layer"), self.sg.Slider(range=(0, 7), orientation='h', size=(34, 10), default_value=0)],
 				[self.sg.Text("ThMin"), self.sg.Slider(range=(0, 255), orientation='h', size=(34, 10), default_value=60)],
 				[self.sg.Text("ThMax"), self.sg.Slider(range=(0, 255), orientation='h', size=(34, 10), default_value=255)],
-				[self.sg.Button('find contours', size=(15,2)),
+				[#self.sg.Button('find contours', size=(15,2)),
 				self.sg.Button('save settings', size=(15,2))]
 					]
 		right_column = [[self.sg.Image(filename='', key='mask_contor_image')],
@@ -94,13 +94,19 @@ class autoDetectRectWin(baseInterface):
 			cnts = imutils.grab_contours(cnts)
 			ratio =1
 			boxes = []
+			if event == 'save settings':
+				save_scv("db/secondWin.csv", self.secondWin_parameters)
+
 			#img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+			cX = 0
+			cY = 0
 			for i,c in enumerate(cnts):
 				# compute the center of the contour, then detect the name of the
 				# shape using only the contour
 				M = cv2.moments(c)
-				cX = int((M["m10"] / M["m00"]) * ratio)
-				cY = int((M["m01"] / M["m00"]) * ratio)
+				if M["m00"] != 0:
+					cX = int((M["m10"] / M["m00"]) * ratio)
+					cY = int((M["m01"] / M["m00"]) * ratio)
 				# multiply the contour (x, y)-coordinates by the resize ratio,
 				# then draw the contours and the name of the shape on the image
 				c = c.astype("float")

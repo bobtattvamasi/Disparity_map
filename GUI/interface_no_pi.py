@@ -157,14 +157,14 @@ class Interface(baseInterface):
 		
 	def lineFinder(self, image):
 		hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-		self.auto_lines = []
+		self.secondWindow.auto_lines = []
 		
 		minVal = 50
 		maxVal = 200
 		layer = 0
 
-		Thmin = 60
-		Thmax = 255
+		Thmin = self.secondWin_parameters["Thmin"]
+		Thmax = self.secondWin_parameters["Thmax"]
 
 		hsv_min = np.array((self.secondWin_parameters["lowH"], self.secondWin_parameters["lowS"], self.secondWin_parameters["lowV"]), np.uint8)
 		hsv_max = np.array((self.secondWin_parameters["highH"], self.secondWin_parameters["highS"], self.secondWin_parameters["highV"]), np.uint8)
@@ -189,12 +189,17 @@ class Interface(baseInterface):
 		ratio =1
 		boxes = []
 		#img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+		j=0
+		mul_coef = 1
+		cX = 0
+		cY = 0
 		for i,c in enumerate(cnts):
 			# compute the center of the contour, then detect the name of the
 			# shape using only the contour
 			M = cv2.moments(c)
-			cX = int((M["m10"] / M["m00"]) * ratio)
-			cY = int((M["m01"] / M["m00"]) * ratio)
+			if M["m00"] != 0:
+				cX = int((M["m10"] / M["m00"]) * ratio)
+				cY = int((M["m01"] / M["m00"]) * ratio)
 			# multiply the contour (x, y)-coordinates by the resize ratio,
 			# then draw the contours and the name of the shape on the image
 			c = c.astype("float")
@@ -213,23 +218,28 @@ class Interface(baseInterface):
 			#print(f"recr = {box}")
 			#-------------------------
 			
-			cv2.putText(image, str(self.letter_dict[i])+str(1), (int(box[0][0] + (box[1][0] - box[0][0])/2),int(box[0][1] + (box[1][1] - box[0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(1), (int(box[0][0] + (box[1][0] - box[0][0])/2),int(box[0][1] + (box[1][1] - box[0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 			fontScale=0.5, color=(255,255,255))
-			self.auto_lines.append([box[0],box[1]])
-			print(f"{self.letter_dict[i]}1 : {round(self.straight_determine_line([box[0],box[1]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[i])+str(2), (int(box[1][0] + (box[2][0] - box[1][0])/2),int(box[1][1] + (box[2][1] - box[1][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			self.secondWindow.auto_lines.append([box[0],box[1]])
+			print(f"{self.letter_dict[j]*mul_coef}1 : {round(self.straight_determine_line([box[0],box[1]]), 2)} mm")
+			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(2), (int(box[1][0] + (box[2][0] - box[1][0])/2),int(box[1][1] + (box[2][1] - box[1][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 			fontScale=0.5, color=(255,255,255))
-			self.auto_lines.append([box[1],box[2]])
-			print(f"{self.letter_dict[i]}2 : {round(self.straight_determine_line([box[1],box[2]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[i])+str(3), (int(box[2][0] + (box[3][0] - box[2][0])/2),int(box[2][1] + (box[3][1] - box[2][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			self.secondWindow.auto_lines.append([box[1],box[2]])
+			print(f"{self.letter_dict[j]*mul_coef}2 : {round(self.straight_determine_line([box[1],box[2]]), 2)} mm")
+			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(3), (int(box[2][0] + (box[3][0] - box[2][0])/2),int(box[2][1] + (box[3][1] - box[2][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 			fontScale=0.5, color=(255,255,255))
-			self.auto_lines.append([box[2],box[3]])
-			print(f"{self.letter_dict[i]}3 : {round(self.straight_determine_line([box[2],box[3]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[i])+str(4), (int(box[3][0] + (box[0][0] - box[3][0])/2),int(box[3][1] + (box[0][1] - box[3][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			self.secondWindow.auto_lines.append([box[2],box[3]])
+			print(f"{self.letter_dict[j]*mul_coef}3 : {round(self.straight_determine_line([box[2],box[3]]), 2)} mm")
+			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(4), (int(box[3][0] + (box[0][0] - box[3][0])/2),int(box[3][1] + (box[0][1] - box[3][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 			fontScale=0.5, color=(255,255,255))
-			self.auto_lines.append([box[3],box[0]])
-			print(f"{self.letter_dict[i]}4 : {round(self.straight_determine_line([box[3],box[0]]), 2)} mm")
+			self.secondWindow.auto_lines.append([box[3],box[0]])
+			print(f"{self.letter_dict[j]*mul_coef}4 : {round(self.straight_determine_line([box[3],box[0]]), 2)} mm")
 			image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
+			j=j+1
+
+			if self.letter_dict[j] == 'z':
+				j=0
+				mul_coef = mul_coef + 1
 			
 		return image
 
@@ -284,7 +294,9 @@ class Interface(baseInterface):
 				#disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 				
 				if event == 'find lines':
+
 					try:
+						disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 						disparity = self.lineFinder(disparity)
 					except:
 						print("find lines dont work")
@@ -329,18 +341,26 @@ class Interface(baseInterface):
 			
 			# Delete lines from graph image
 			if event == "clear lines":
-				lines = []
-				self.secondWindow.auto_lines = []
-				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
-				graph.TKCanvas.delete('all')
+				try:
+					lines = []
+					self.secondWindow.auto_lines = []
+					disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+					graph.TKCanvas.delete('all')
+					self.window.FindElement("_output_").Update('')
+					print("All lines is deleted.")
+				except:
+					self.window.FindElement("_output_").Update('')
+					print("ERROR:Something wrong with 'clear lines'")
 
 			# Open window with settings
 			if event == 'lineFinder Settings':
 				#self.window_cubeFinder(disparity)
 				try:
+					disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 					self.secondWindow.run(disparity)
 				except:
-					print("firstly create disparity map!")
+					self.window.FindElement("_output_").Update('')
+					print("ERROR:Firstly create disparity map!")
 					print(traceback.format_exc()) 
 			
 			
@@ -358,14 +378,14 @@ class Interface(baseInterface):
 			# События рисования на графе нажатием кнопки мыши
 			if event == "graph":
 				x,y = values["graph"]
-				print (f"mouse down at ({x},{y})")
+				#print (f"mouse down at ({x},{y})")
 				if not dragging:
 					start_p = (x,y)
 					dragging = True
 				else:
 					end_p = (x,y)
 					
-			elif event.endswith('+UP'):
+			elif event.endswith('+UP') and end_p!= None:
 				start_point = start_p
 				end_point = end_p
 				print(f"grabbed rectangle from {start_point} to {end_point}")
@@ -378,24 +398,46 @@ class Interface(baseInterface):
 			
 			if event == 'create map':
 				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+				self.secondWindow.auto_lines = []
+				lines = []
+				self.window.FindElement("_output_").Update('')
+				print("Deep map is created.")
 
 			# Нажатие на кнопку "Вычислить", которая должна вернуть 
 			# наименования граней и их размеры(Для линий которые мы сами нарисовали).
 			if event == 'find length':
 				try:
-					for i in range(len(lines)):
-						if lines[i] == None:
-							del lines[i]
-						elif lines[i][0] == None or lines[i][1] == None:
-							del lines[i]
-					#print(f"lines2 = {lines}")
-					
-					self.window.FindElement("_output_").Update('')
-					
-					for i,line in enumerate(lines):
-						#line_size = self.determine_line(value_disparity, line)
-						line_size = self.straight_determine_line(line)
-						print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
+					if len(lines) == 0 and len(self.secondWindow.auto_lines) == 0:
+						self.window.FindElement("_output_").Update('')
+						print("No lines that I can to find.")
+					else:
+						self.window.FindElement("_output_").Update('')
+						mul_coef = 1
+						k=0
+						for i in range(0, len(self.secondWindow.auto_lines), 4):
+							print(f"Object {int(i/4) + 1}")
+							for j in range(4):
+								box0,box1 = self.secondWindow.auto_lines[i+j]
+								print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(self.straight_determine_line([box0,box1]), 2)} mm")
+							if self.letter_dict[k] == 'z':
+								k=0
+								mul_coef = mul_coef + 1
+								continue
+
+							k = k+1
+							
+
+						for i in range(len(lines)):
+							if lines[i] == None:
+								del lines[i]
+							elif lines[i][0] == None or lines[i][1] == None:
+								del lines[i]
+						#print(f"lines2 = {lines}")
+						
+						for i,line in enumerate(lines):
+							#line_size = self.determine_line(value_disparity, line)
+							line_size = self.straight_determine_line(line)
+							print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
 				except:
 					print("find length dont work")
 					print(traceback.format_exc())
