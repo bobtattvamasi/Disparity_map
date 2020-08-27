@@ -1,4 +1,4 @@
-from GUI.interface_no_pi import Interface
+from GUI.interface import Interface
 
 def main():
 	interbox = Interface("DarkAmber", 'Demo Determine Line Lenght')

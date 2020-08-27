@@ -35,21 +35,21 @@ class PiVideoStream:
 	def stop(self):
 		self.stopped = True
 		
-def main():
-	vs = PiVideoStream().start()
-	time.sleep(2.0)
+# ~ def main():
+	# ~ vs = PiVideoStream().start()
+	# ~ time.sleep(2.0)
 
-	while True:
-		frame = vs.read()
-		print(f"frame size = {frame.shape}")
-		cv2.imshow("Frame", frame)
-		key = cv2.waitKey(1)
+	# ~ while True:
+		# ~ frame = vs.read()
+		# ~ print(f"frame size = {frame.shape}")
+		# ~ cv2.imshow("Frame", frame)
+		# ~ key = cv2.waitKey(1)
 		
-		if key & 0xFF == ord('q'):
-			break
+		# ~ if key & 0xFF == ord('q'):
+			# ~ break
 
-	cv2.destroyAllWindows()
-	vs.stop()
+	# ~ cv2.destroyAllWindows()
+	# ~ vs.stop()
 
-if __name__ == '__main__':
-	main()
+# ~ if __name__ == '__main__':
+	# ~ main()

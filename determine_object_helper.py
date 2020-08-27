@@ -52,9 +52,9 @@ def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
 
 	# Cчитываем стерео-изображение
 	# if we from PiCamera
-	#pair_img = cv2.cvtColor(imageToDisp,cv2.COLOR_BGR2GRAY)
+	pair_img = cv2.cvtColor(imageToDisp,cv2.COLOR_BGR2GRAY)
 	# If we from pictures
-	pair_img = cv2.imread(imageToDisp,0)
+	#pair_img = cv2.imread(imageToDisp,0)
 
 	# Разделяем на левое и правое
 	imgLeft = pair_img [0:photo_height,0:image_width] #Y+H and X+W
@@ -129,9 +129,15 @@ def stereo_depth_map(rectified_pair, parameters, ifsave=True):
 	#print(f"min = {local_min},max = {local_max}")
 	# print ("MAX " + str(local_max))
 	# print ("MIN " + str(local_min))
-	disparity_visual = (disparity-local_min)*(1.0/(local_max-local_min))
+	disparity_visual = (disparity-local_min)*(1.0/0.00000001)
+	if (local_max-local_min) != 0:
+		disparity_visual = (disparity-local_min)*(1.0/(local_max-local_min))
+	disparity_grayscale = (disparity-local_min)*(65535.0/0.00000001)
 	if ifsave:
-		disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
+		if (local_max-local_min) != 0:
+			disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
+		else:
+			disparity_grayscale = (disparity-local_min)*(65535.0/0.000000000001)
 		#disparity_grayscale = (disparity+208)*(65535.0/1000.0) # test for jumping colors prevention 
 		disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
 		disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)

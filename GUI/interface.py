@@ -4,8 +4,8 @@ import glob
 import sys, traceback
 import subprocess
 import math
-# import picamera
-# from picamera import PiCamera
+import picamera
+from picamera import PiCamera
 import numpy as np
 import string
 import imutils
@@ -45,23 +45,23 @@ class Interface(baseInterface):
 		self.cam_width = 2560
 		self.cam_height = 720
 		# Final image capture settings
-		# scale_ratio = 1
+		scale_ratio = 1
 		# # Camera resolution height must be dividable by 16, and width by 32
-		# cam_width = int((self.cam_width+31)/32)*32
-		# cam_height = int((self.cam_height+15)/16)*16
-		# print ("Camera resolution: "+str(cam_width)+" x "+str(cam_height))
+		cam_width = int((self.cam_width+31)/32)*32
+		cam_height = int((self.cam_height+15)/16)*16
+		print ("Camera resolution: "+str(cam_width)+" x "+str(cam_height))
 
 		# # Buffer for captured image settings
-		# self.img_width = int (cam_width * scale_ratio)
-		# self.img_height = int (cam_height * scale_ratio)
-		# self.capture = np.zeros((self.img_height, self.img_width, 4), dtype=np.uint8)
-		# print ("Scaled image resolution: "+str(self.img_width)+" x "+str(self.img_height))
+		self.img_width = int (cam_width * scale_ratio)
+		self.img_height = int (cam_height * scale_ratio)
+		self.capture = np.zeros((self.img_height, self.img_width, 4), dtype=np.uint8)
+		print ("Scaled image resolution: "+str(self.img_width)+" x "+str(self.img_height))
 
 		# # Initialize the camera
-		# self.camera = PiCamera(stereo_mode='side-by-side',stereo_decimate=False)
-		# self.camera.resolution=(cam_width, cam_height)
-		# self.camera.framerate = 20
-		# self.camera.hflip = True
+		self.camera = PiCamera(stereo_mode='side-by-side',stereo_decimate=False)
+		self.camera.resolution=(cam_width, cam_height)
+		self.camera.framerate = 20
+		self.camera.hflip = True
 		#self.vs = PiVideoStream(resolution=(self.cam_width,self.cam_height)).start()
 
 		# Создаем словарь параметров для настройки карты глубины,
@@ -102,21 +102,21 @@ class Interface(baseInterface):
 			[self.sg.Image(filename='', key='image')],
 			# Далее идут слайдеры параметров для настройки выходной карты глубин
 			[self.sg.Frame('Settings',[
-			[self.sg.Text("SpklWinSze"), self.sg.Slider(range=(0, 300), orientation='h', size=(34, 10), default_value=self.parameters["SpklWinSze"])],
-			[self.sg.Text("SpcklRng"), self.sg.Slider(range=(0, 40), orientation='h', size=(34, 10), default_value=self.parameters["SpcklRng"])],
-			[self.sg.Text("UnicRatio"), self.sg.Slider(range=(1, 80), orientation='h', size=(34, 10), default_value=self.parameters["UnicRatio"])],
+			[self.sg.Text("SpklWinSze "), self.sg.Slider(range=(0, 300), orientation='h', size=(34, 10), default_value=self.parameters["SpklWinSze"])],
+			[self.sg.Text("SpcklRng   "), self.sg.Slider(range=(0, 40), orientation='h', size=(34, 10), default_value=self.parameters["SpcklRng"])],
+			[self.sg.Text("UnicRatio  "), self.sg.Slider(range=(1, 80), orientation='h', size=(34, 10), default_value=self.parameters["UnicRatio"])],
 			[self.sg.Text("TxtrThrshld"), self.sg.Slider(range=(0, 1000), orientation='h', size=(34, 10), default_value=self.parameters["TxtrThrshld"])],
-			[self.sg.Text("NumOfDisp"), self.sg.Slider(range=(16, 256), orientation='h', size=(34, 10), default_value=self.parameters["NumOfDisp"])],
-			[self.sg.Text("MinDISP"), self.sg.Slider(range=(-300, 300), orientation='h', size=(34, 10), default_value=self.parameters["MinDISP"])],
-			[self.sg.Text("PreFiltCap"), self.sg.Slider(range=(5, 63), orientation='h', size=(34, 10), default_value=self.parameters["PreFiltCap"])],
-			[self.sg.Text("PFS"), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=self.parameters["PFS"])],
+			[self.sg.Text("NumOfDisp  "), self.sg.Slider(range=(16, 256), orientation='h', size=(34, 10), default_value=self.parameters["NumOfDisp"])],
+			[self.sg.Text("MinDISP    "), self.sg.Slider(range=(-300, 300), orientation='h', size=(34, 10), default_value=self.parameters["MinDISP"])],
+			[self.sg.Text("PreFiltCap "), self.sg.Slider(range=(5, 63), orientation='h', size=(34, 10), default_value=self.parameters["PreFiltCap"])],
+			[self.sg.Text("PFS        "), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=self.parameters["PFS"])],
 			#[self.sg.Text("SWS"), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=5)]
 			[self.sg.Button("save settings", size=(10,1))]
 			])],
 			# button for create map of disparity
 			[self.sg.Button('create map', size=(15,2)),
 			# Кнопка по которой вычисляются размеры найденных граней
-			self.sg.Button('find length', size=(15,2)),
+			self.sg.Button('find distances', size=(15,2)),
 			# Кнопка котороя показывает следующее изображение
 			#self.sg.Button('Next Picture ->', size=(15,2))
 			# Кнопка котороя delete lines
@@ -139,8 +139,8 @@ class Interface(baseInterface):
 					drag_submits=True # mouse drag events]
 					)],
 			# Вывод всей важной информации происходит здесь
-			[self.sg.Output(size=(64, 12), key = '_output_')],
-			[self.sg.Button('lineFinder Settings', size=(15,2)), self.sg.Button('find lines', size=(15,2))]
+			[self.sg.Output(size=(64, 21), key = '_output_')],
+			[self.sg.Button('lineFinder Settings', size=(15,2)), self.sg.Button('auto-lineFinder', size=(15,2))]
 			
 		]
 
@@ -172,12 +172,13 @@ class Interface(baseInterface):
 		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		height, width = gray.shape
 		mask = np.zeros((height,width))
-		cv2.rectangle(mask, (80,140), (460,355), 255, -1)
+		cv2.rectangle(mask, (100,60), (460,355), 255, -1)
 		#masked_data = cv2.bitwise_and(gray, gray, mask=mask)
 		gray[mask < 255] = 0
 		hsv_frame[mask < 255] = 0
 		mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
 		#img = image[140:355, 80:460]
+		second_inRange = cv2.inRange(image, np.array([0,0,0]), np.array([16,50,255]))
 		
 		#gray = image
 		blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
@@ -218,6 +219,7 @@ class Interface(baseInterface):
 			#print(f"recr = {box}")
 			#-------------------------
 			
+			print(f"object {j+1}:")
 			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(1), (int(box[0][0] + (box[1][0] - box[0][0])/2),int(box[0][1] + (box[1][1] - box[0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 			fontScale=0.5, color=(255,255,255))
 			self.secondWindow.auto_lines.append([box[0],box[1]])
@@ -247,13 +249,13 @@ class Interface(baseInterface):
 	# Основная функция в котором работает наше окно
 	def run(self):
 		# Двойное изображение
-		imageToDisp = self.imageToDisp[self.index]
+		#imageToDisp = self.imageToDisp[self.index]
 
 		
 
 		# Калибровка и разделение изображений на левое и правое
-		imgL, imgR = calibrate_two_images(imageToDisp)
-		rectified_pair = (imgL, imgR)
+		# ~ imgL, imgR = calibrate_two_images(imageToDisp)
+		# ~ rectified_pair = (imgL, imgR)
 
 		# Флаг для перерисовывания графа(для возможности рисовать на нем)
 		a_id = None
@@ -269,8 +271,8 @@ class Interface(baseInterface):
 		
 
 		# The PSG "Event Loop"
-		#for frame in self.camera.capture_continuous(self.capture, format="bgra", use_video_port=True, resize=(self.cam_width,self.cam_height)):                     
-		while True:
+		for frame in self.camera.capture_continuous(self.capture, format="bgra", use_video_port=True, resize=(self.cam_width,self.cam_height)):                     
+		#while True:
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
 
 			if event is None or event == self.sg.WIN_CLOSED or event == 'Cancel':  
@@ -278,7 +280,7 @@ class Interface(baseInterface):
 
 			#imageToDisp = self.vs.read()
 			
-			#imageToDisp = frame
+			imageToDisp = frame
 			#imgLeft = frame [0:362,0:640]
 			#print(f"frame = {imageToDisp.shape}")
 			#leftI = frame[0:720, 0:1280]
@@ -293,8 +295,8 @@ class Interface(baseInterface):
 
 				#disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 				
-				if event == 'find lines':
-
+				if event == 'auto-lineFinder':
+					self.window.FindElement("_output_").Update('')
 					try:
 						disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 						disparity = self.lineFinder(disparity)
@@ -308,7 +310,7 @@ class Interface(baseInterface):
 				# Перерисовка графа
 				if a_id:
 					graph.DeleteFigure(a_id)
-				a_id = graph.DrawImage(data=cv2.imencode('.png', disparity)[1].tobytes(), location=(0, 400))
+				a_id = graph.DrawImage(data=cv2.imencode('.png', disparity)[1].tobytes(), location=(0, 362))
 				# Рисовние линий
 				for i,line in enumerate(lines):
 					if line[0] is not None and line[1] is not None:
@@ -398,14 +400,14 @@ class Interface(baseInterface):
 			
 			if event == 'create map':
 				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
-				self.secondWindow.auto_lines = []
-				lines = []
+				#self.secondWindow.auto_lines = []
+				#lines = []
 				self.window.FindElement("_output_").Update('')
 				print("Deep map is created.")
 
 			# Нажатие на кнопку "Вычислить", которая должна вернуть 
 			# наименования граней и их размеры(Для линий которые мы сами нарисовали).
-			if event == 'find length':
+			if event == 'find distances':
 				try:
 					if len(lines) == 0 and len(self.secondWindow.auto_lines) == 0:
 						self.window.FindElement("_output_").Update('')
@@ -439,7 +441,7 @@ class Interface(baseInterface):
 							line_size = self.straight_determine_line(line)
 							print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
 				except:
-					print("find length dont work")
+					print("'find distances' dont work")
 					print(traceback.format_exc())
 
 	def deepMap_updater(self,imageToDisp, values):

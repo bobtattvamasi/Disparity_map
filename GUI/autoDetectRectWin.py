@@ -46,6 +46,7 @@ class autoDetectRectWin(baseInterface):
 		window = self.sg.Window(self.TextForApp, layout)
 		self.auto_lines = []
 		hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+		second_inRange = cv2.inRange(image, np.array([0,0,0]), np.array([16,50,255]))
 		
 		while True:
 			event, values = window.read(timeout=200)
@@ -77,8 +78,12 @@ class autoDetectRectWin(baseInterface):
 			gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 			height, width = gray.shape
 			mask = np.zeros((height,width))
-			cv2.rectangle(mask, (80,140), (460,355), 255, -1)
+			cv2.rectangle(mask, (100,60), (460,355), 255, -1)
 			#masked_data = cv2.bitwise_and(gray, gray, mask=mask)
+			
+			#output = cv2.bitwise_and(image, image, mask = second_inRange)
+			#output = cv2.cvtColor(output, cv2.COLOR_RGB2GRAY)
+			
 			gray[mask < 255] = 0
 			hsv_frame[mask < 255] = 0
 			mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
@@ -95,7 +100,7 @@ class autoDetectRectWin(baseInterface):
 			ratio =1
 			boxes = []
 			if event == 'save settings':
-				save_scv("db/secondWin.csv", self.secondWin_parameters)
+				save_csv("db/secondWin.csv", self.secondWin_parameters)
 
 			#img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 			cX = 0
@@ -113,7 +118,7 @@ class autoDetectRectWin(baseInterface):
 				c *= ratio
 				c = c.astype("int")
 				contour_area = cv2.contourArea(c)
-				if contour_area < 190 or contour_area > 2400:
+				if contour_area < 500 or contour_area > 2400:
 					continue
 				#print(f"{i} : area = {contour_area}")
 				peri = cv2.arcLength(c, True)
@@ -142,8 +147,8 @@ class autoDetectRectWin(baseInterface):
 			
 
 			window.FindElement('cube_image').Update(data=cv2.imencode('.png', image)[1].tobytes())
-			window.FindElement('mask_contor_image').Update(data=cv2.imencode('.png', gray)[1].tobytes())
-			window.FindElement('hsv_image').Update(data=cv2.imencode('.png', mask_frame)[1].tobytes())
+			window.FindElement('mask_contor_image').Update(data=cv2.imencode('.png', thresh)[1].tobytes())
+			window.FindElement('hsv_image').Update(data=cv2.imencode('.png', second_inRange)[1].tobytes())
 
 		window.close()
 

@@ -9,7 +9,7 @@ def read_csv(file_name):
 
 	return parameters
 
-def save_scv(file_name, parameters):
+def save_csv(file_name, parameters):
 	with open(file_name,"w") as f:
 		w = csv.writer(f)
 		for key, val in parameters.items():
