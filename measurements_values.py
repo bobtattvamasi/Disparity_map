@@ -9,5 +9,6 @@ class defaultValues(NamedTuple):
 	#folderTestScenes = './data/objects_high/*.png'
 	#folderTestScenes = './data/objects_low/*.png'
 	folderTestScenes = './data/photo_data/*.png'
+	folderTestScenes = './data/data_for_test/*.png'
 
 	

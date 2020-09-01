@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import PySimpleGUI as sg
+import string
 
 # Базовый класс интерфейса
 class baseInterface(ABC):
@@ -8,6 +9,8 @@ class baseInterface(ABC):
 		self.sg = sg
 		self.sg.theme(themeStyle)
 		self.icon = "data/8.ico"
+		# Словарь букв для отображения линий
+		self.letter_dict = dict(zip([i for i in range(0,26)],string.ascii_uppercase))
 		layout = []
 		self.window = self.sg.Window(TextForApp, 
 						layout, icon=self.icon, resizable=True)

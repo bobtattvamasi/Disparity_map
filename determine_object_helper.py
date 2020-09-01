@@ -8,6 +8,7 @@ import numpy as np
 #import imutils
 # from death_map import *
 from measurements_values import defaultValues
+import imutils
 
 # Функция для отображения картинок на фронте
 def convert_to_bytes(file_or_bytes, resize=None):
@@ -41,7 +42,7 @@ def convert_to_bytes(file_or_bytes, resize=None):
 	return bio.getvalue()
 
 # Функция калибрует два изображения, разделяет их и эти два возвращает
-def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
+def calibrate_two_images(imageToDisp, ifCamPi = True, photoDim=None, imageDim=None):
 	# Определяем размеры(ширина,высота) сдвоенного изображения со стереокамеры и
 	# разделенных левого и правого.
 	photo_width = defaultValues.PHOTO_WIDTH
@@ -52,9 +53,12 @@ def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
 
 	# Cчитываем стерео-изображение
 	# if we from PiCamera
-	pair_img = cv2.cvtColor(imageToDisp,cv2.COLOR_BGR2GRAY)
+	pair_img = None
+	if ifCamPi:
+		pair_img = cv2.cvtColor(imageToDisp,cv2.COLOR_BGR2GRAY)
 	# If we from pictures
-	#pair_img = cv2.imread(imageToDisp,0)
+	else:
+		pair_img = cv2.imread(imageToDisp,0)
 
 	# Разделяем на левое и правое
 	imgLeft = pair_img [0:photo_height,0:image_width] #Y+H and X+W
@@ -93,21 +97,14 @@ def calibrate_two_images(imageToDisp, photoDim=None, imageDim=None):
 	#cv2.waitKey(0)
 	return imgLs, imgRs
 
-# Функция возвращает карту шлубин по калиброванным стереофото
-def stereo_depth_map(rectified_pair, parameters, ifsave=True):
-	#SPWS = parameters['SpklWinSze']
-	#PFS = parameters['PFS']
-	#PFC = parameters['PreFiltCap']
-	#MDS = parameters['MinDISP']
-	#NOD = parameters['NumOfDisp']
-	#TTH = parameters['TxtrThrshld']
-	#UR = parameters['UnicRatio']
-	#SR = parameters['SpcklRng']
-	#SWS = parameters['SWS']
-	
-	#print(f"r,c = {rectified_pair[0].shape}")
-	c, r = rectified_pair[0].shape
-	disparity = np.zeros((c,r), np.uint8)
+autotune_min = 10000000
+autotune_max = -10000000
+
+def stereo_depth_map(rectified_pair, parameters):
+	dmLeft = rectified_pair[0]
+	dmRight = rectified_pair[1]
+
+	#disparity = np.zeros((c,r), np.uint8)
 	sbm = cv2.StereoBM_create(numDisparities=16, blockSize=15)
 	sbm.setPreFilterType(1)
 	sbm.setPreFilterSize(parameters['PFS'])
@@ -118,40 +115,79 @@ def stereo_depth_map(rectified_pair, parameters, ifsave=True):
 	sbm.setUniquenessRatio(parameters['UnicRatio'])
 	sbm.setSpeckleRange(parameters['SpcklRng'])
 	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])
-	dmLeft = rectified_pair[0]
-	dmRight = rectified_pair[1]
+	
 	disparity = sbm.compute(dmLeft, dmRight)
-	#print(f"disparity.shape = {disparity.shape}")
-	value_disparity= disparity
-	#disparity_visual = cv.CreateMat(c, r, cv.CV_8U)
 	local_max = disparity.max()
 	local_min = disparity.min()
-	#print(f"min = {local_min},max = {local_max}")
-	# print ("MAX " + str(local_max))
-	# print ("MIN " + str(local_min))
-	disparity_visual = (disparity-local_min)*(1.0/0.00000001)
-	if (local_max-local_min) != 0:
-		disparity_visual = (disparity-local_min)*(1.0/(local_max-local_min))
-	disparity_grayscale = (disparity-local_min)*(65535.0/0.00000001)
-	if ifsave:
-		if (local_max-local_min) != 0:
-			disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
-		else:
-			disparity_grayscale = (disparity-local_min)*(65535.0/0.000000000001)
-		#disparity_grayscale = (disparity+208)*(65535.0/1000.0) # test for jumping colors prevention 
-		disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
-		disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
-		#cv2.imshow("Image", disparity_color)
+
+	global autotune_max, autotune_min
+	autotune_max = max(autotune_max, disparity.max())
+	autotune_min = min(autotune_min, disparity.min())
+
+	disparity_grayscale = (disparity-autotune_min)*(65535.0/(autotune_max-autotune_min))
+	disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+	disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
+	return disparity_color,  disparity.astype(np.float32) / 16.0
+
+# Функция возвращает карту шлубин по калиброванным стереофото
+# def stereo_depth_map(rectified_pair, parameters, ifsave=True):
+# 	#SPWS = parameters['SpklWinSze']
+# 	#PFS = parameters['PFS']
+# 	#PFC = parameters['PreFiltCap']
+# 	#MDS = parameters['MinDISP']
+# 	#NOD = parameters['NumOfDisp']
+# 	#TTH = parameters['TxtrThrshld']
+# 	#UR = parameters['UnicRatio']
+# 	#SR = parameters['SpcklRng']
+# 	#SWS = parameters['SWS']
+	
+# 	#print(f"r,c = {rectified_pair[0].shape}")
+# 	c, r = rectified_pair[0].shape
+# 	disparity = np.zeros((c,r), np.uint8)
+# 	sbm = cv2.StereoBM_create(numDisparities=16, blockSize=15)
+# 	sbm.setPreFilterType(1)
+# 	sbm.setPreFilterSize(parameters['PFS'])
+# 	sbm.setPreFilterCap(parameters['PreFiltCap'])
+# 	sbm.setMinDisparity(parameters['MinDISP'])
+# 	sbm.setNumDisparities(parameters['NumOfDisp'])
+# 	sbm.setTextureThreshold(parameters['TxtrThrshld'])
+# 	sbm.setUniquenessRatio(parameters['UnicRatio'])
+# 	sbm.setSpeckleRange(parameters['SpcklRng'])
+# 	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])
+# 	dmLeft = rectified_pair[0]
+# 	dmRight = rectified_pair[1]
+# 	disparity = sbm.compute(dmLeft, dmRight)
+# 	#print(f"disparity.shape = {disparity.shape}")
+# 	value_disparity= disparity
+# 	#disparity_visual = cv.CreateMat(c, r, cv.CV_8U)
+# 	local_max = disparity.max()
+# 	local_min = disparity.min()
+# 	#print(f"min = {local_min},max = {local_max}")
+# 	# print ("MAX " + str(local_max))
+# 	# print ("MIN " + str(local_min))
+# 	disparity_visual = (disparity-local_min)*(1.0/0.00000001)
+# 	if (local_max-local_min) != 0:
+# 		disparity_visual = (disparity-local_min)*(1.0/(local_max-local_min))
+# 	disparity_grayscale = (disparity-local_min)*(65535.0/0.00000001)
+# 	if ifsave:
+# 		if (local_max-local_min) != 0:
+# 			disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
+# 		else:
+# 			disparity_grayscale = (disparity-local_min)*(65535.0/0.000000000001)
+# 		#disparity_grayscale = (disparity+208)*(65535.0/1000.0) # test for jumping colors prevention 
+# 		disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+# 		disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
+# 		#cv2.imshow("Image", disparity_color)
 		
-		cv2.imwrite("fulldisp.jpg",disparity_color)
-	local_max = disparity_visual.max()
-	local_min = disparity_visual.min()
-	# print ("MAX " + str(local_max))
-	# print ("MIN " + str(local_min))
-	#cv.Normalize(disparity, disparity_visual, 0, 255, cv.CV_MINMAX)
-	#disparity_visual = np.array(disparity_visual)
-	disparity_visual = cv2.resize (disparity_visual, dsize=(960, 543), interpolation = cv2.INTER_CUBIC)
-	return disparity_color, value_disparity
+# 		cv2.imwrite("fulldisp.jpg",disparity_color)
+# 	local_max = disparity_visual.max()
+# 	local_min = disparity_visual.min()
+# 	# print ("MAX " + str(local_max))
+# 	# print ("MIN " + str(local_min))
+# 	#cv.Normalize(disparity, disparity_visual, 0, 255, cv.CV_MINMAX)
+# 	#disparity_visual = np.array(disparity_visual)
+# 	disparity_visual = cv2.resize (disparity_visual, dsize=(960, 543), interpolation = cv2.INTER_CUBIC)
+# 	return disparity_color, value_disparity
 
 # Функция находит границы объекта на карте глубин изображении
 def contours_finder(img, minVal, maxVal, layer, index):
@@ -187,6 +223,109 @@ def contours_finder(img, minVal, maxVal, layer, index):
 	# cv2.imshow("img", img)
 	# cv2.waitKey(0)
 	return img
+
+
+def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
+
+	#hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+	hsv_min = np.array((self_.secondWin_parameters["lowH"], self_.secondWin_parameters["lowS"], self_.secondWin_parameters["lowV"]), np.uint8)
+	hsv_max = np.array((self_.secondWin_parameters["highH"], self_.secondWin_parameters["highS"], self_.secondWin_parameters["highV"]), np.uint8)
+
+
+	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	height, width = gray.shape
+
+	mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
+
+	blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
+
+	thresh = cv2.threshold(blurred, self_.secondWin_parameters["Thmin"], 
+				self_.secondWin_parameters["Thmax"], cv2.THRESH_BINARY)[1]
+				
+	image_blur = cv2.medianBlur(thresh, 25)
+	
+	image_res, thresh = cv2.threshold(image_blur, 240,255, cv2.THRESH_BINARY_INV)
+
+	cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+							cv2.CHAIN_APPROX_SIMPLE)
+	cnts = imutils.grab_contours(cnts)
+	ratio = 1
+
+	j=0
+	mul_coef = 1
+
+	cX = 0
+	cY = 0
+
+	self_.auto_lines = []
+
+	for i,c in enumerate(cnts):
+		# compute the center of the contour, then detect the name of the
+		# shape using only the contour
+		M = cv2.moments(c)
+		if M["m00"] != 0:
+			cX = int((M["m10"] / M["m00"]) * ratio)
+			cY = int((M["m01"] / M["m00"]) * ratio)
+
+		# multiply the contour (x, y)-coordinates by the resize ratio,
+		# then draw the contours and the name of the shape on the image
+		c = c.astype("float")
+		c *= ratio
+		c = c.astype("int")
+		contour_area = cv2.contourArea(c)
+		if contour_area < 150:
+			continue
+		#print(f"{i} : area = {contour_area}")
+		peri = cv2.arcLength(c, True)
+		c = cv2.approxPolyDP(c, 0.020 * peri, True)
+		# rotated rect constructor
+		rect = cv2.minAreaRect(c)
+		
+		box = np.int0(cv2.boxPoints(rect))
+		#print(f"recr = {box}")
+		#-------------------------
+		if ifPrintRect:
+			print(f"object {j+1}:")
+		# for printing all lines of object
+		for k in range(4):
+			last = k+1
+			if last ==4:
+				last = 0			
+			cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			fontScale=0.5, color=(255,255,255))
+			
+			if ifPrintRect:
+				self_.secondWindow.auto_lines.append([box[k],box[last]])
+				print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.straight_determine_line([box[k],box[last]]), 2)} mm")
+		j=j+1
+		if self_.letter_dict[j] == 'Z':
+			j=0
+			mul_coef = mul_coef + 1
+		
+		
+			
+
+		if not ifPrintRect:
+
+			self_.auto_lines.append([box[0],box[1]])
+			self_.auto_lines.append([box[1],box[2]])
+			self_.auto_lines.append([box[2],box[3]])
+			self_.auto_lines.append([box[3],box[0]])
+		
+		# # rect constructor ------
+		# (x,y,w,h) = cv2.boundingRect(c)
+		# boxes.append([x,y,x+w, y+h])
+		# cv2.rectangle(image, (x,y), (x+w,y+h),(0,0,255),2)
+		# -----------------------
+		image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
+
+	return image, mask_frame, thresh
+
+
+
+
+
 
 
 

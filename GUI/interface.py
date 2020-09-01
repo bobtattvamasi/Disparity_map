@@ -1,19 +1,18 @@
 import cv2, PySimpleGUI as sg
 import base64
 import glob
-import sys, traceback
+import sys, traceback, os
 import subprocess
 import math
 import picamera
 from picamera import PiCamera
 import numpy as np
-import string
 import imutils
 
 # Imports from files
 from GUI.baseInterface import baseInterface
 from measurements_values import defaultValues
-from point_cloud import stereo_depth_map as depth_map, create_points_cloud
+from point_cloud import create_points_cloud
 from determine_object_helper import convert_to_bytes, calibrate_two_images, stereo_depth_map, contours_finder
 from GUI.tools_for_intaface import *
 from GUI.autoDetectRectWin import autoDetectRectWin
@@ -25,22 +24,10 @@ from GUI.autoDetectRectWin import autoDetectRectWin
 # Основное окно
 class Interface(baseInterface):
 
-	# Функия считывает все картинки из папки
-	def image_to_disp(self,path_to_imagesFolder):
-		photo_files = []
-		i = 0
-		for file in glob.glob(path_to_imagesFolder):
-			photo_files.append(file)
-		return photo_files, i
-
 
 	def __init__(self, themeStyle, TextForApp):
 		super().__init__(themeStyle, TextForApp)
-
-		# Список имен изображений, индекс-указатель на определенное
-		# изображение
-		self.imageToDisp, self.index = self.image_to_disp(defaultValues.folderTestScenes)
-		
+				
 		# Camera settimgs
 		self.cam_width = 2560
 		self.cam_height = 720
@@ -82,17 +69,7 @@ class Interface(baseInterface):
 		# прямоугольных  объектов.
 		self.secondWin_parameters = read_csv("db/secondWin.csv")
 
-		# Словарь букв для отображения линий
-		self.letter_dict = dict(zip([i for i in range(0,26)],string.ascii_uppercase))
-
-		# self.secondWin_parameters = {"lowH":0,
-		# 				"highH":179,
-		# 				"lowS":99,
-		# 				"highS":255,
-		# 				"lowV":133,
-		# 				"highV":255}
-
-
+		
 		# --------------------------------------------
 		# Разделяем пространство окна на левое и правое
 		#
@@ -110,15 +87,12 @@ class Interface(baseInterface):
 			[self.sg.Text("MinDISP    "), self.sg.Slider(range=(-300, 300), orientation='h', size=(34, 10), default_value=self.parameters["MinDISP"])],
 			[self.sg.Text("PreFiltCap "), self.sg.Slider(range=(5, 63), orientation='h', size=(34, 10), default_value=self.parameters["PreFiltCap"])],
 			[self.sg.Text("PFS        "), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=self.parameters["PFS"])],
-			#[self.sg.Text("SWS"), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=5)]
 			[self.sg.Button("save settings", size=(10,1))]
 			])],
 			# button for create map of disparity
 			[self.sg.Button('create map', size=(15,2)),
 			# Кнопка по которой вычисляются размеры найденных граней
 			self.sg.Button('find distances', size=(15,2)),
-			# Кнопка котороя показывает следующее изображение
-			#self.sg.Button('Next Picture ->', size=(15,2))
 			# Кнопка котороя delete lines
 			self.sg.Button('clear lines', size=(15,2))
 			]
@@ -140,7 +114,8 @@ class Interface(baseInterface):
 					)],
 			# Вывод всей важной информации происходит здесь
 			[self.sg.Output(size=(64, 21), key = '_output_')],
-			[self.sg.Button('lineFinder Settings', size=(15,2)), self.sg.Button('auto-lineFinder', size=(15,2))]
+			[self.sg.Button('lineFinder Settings', size=(15,2)), self.sg.Button('auto-lineFinder', size=(15,2))],
+			[self.sg.Button('build 3DpointsCloud', size=(15,2)), self.sg.Button('Show 3D-Points', size=(15,2))]
 			
 		]
 
@@ -159,104 +134,92 @@ class Interface(baseInterface):
 		hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 		self.secondWindow.auto_lines = []
 		
-		minVal = 50
-		maxVal = 200
-		layer = 0
+		# minVal = 50
+		# maxVal = 200
+		# layer = 0
 
-		Thmin = self.secondWin_parameters["Thmin"]
-		Thmax = self.secondWin_parameters["Thmax"]
+		# Thmin = self.secondWin_parameters["Thmin"]
+		# Thmax = self.secondWin_parameters["Thmax"]
 
-		hsv_min = np.array((self.secondWin_parameters["lowH"], self.secondWin_parameters["lowS"], self.secondWin_parameters["lowV"]), np.uint8)
-		hsv_max = np.array((self.secondWin_parameters["highH"], self.secondWin_parameters["highS"], self.secondWin_parameters["highV"]), np.uint8)
+		# hsv_min = np.array((self.secondWin_parameters["lowH"], self.secondWin_parameters["lowS"], self.secondWin_parameters["lowV"]), np.uint8)
+		# hsv_max = np.array((self.secondWin_parameters["highH"], self.secondWin_parameters["highS"], self.secondWin_parameters["highV"]), np.uint8)
 		
-		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-		height, width = gray.shape
-		mask = np.zeros((height,width))
-		cv2.rectangle(mask, (100,60), (460,355), 255, -1)
-		#masked_data = cv2.bitwise_and(gray, gray, mask=mask)
-		gray[mask < 255] = 0
-		hsv_frame[mask < 255] = 0
-		mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
-		#img = image[140:355, 80:460]
-		second_inRange = cv2.inRange(image, np.array([0,0,0]), np.array([16,50,255]))
+		# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		# height, width = gray.shape
+		# # ~ mask = np.zeros((height,width))
+		# # ~ cv2.rectangle(mask, (100,60), (460,355), 255, -1)
+		# # ~ #masked_data = cv2.bitwise_and(gray, gray, mask=mask)
+		# # ~ gray[mask < 255] = 0
+		# # ~ hsv_frame[mask < 255] = 0
+		# mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
+		# #img = image[140:355, 80:460]
+		# second_inRange = cv2.inRange(image, np.array([0,0,0]), np.array([16,50,255]))
 		
-		#gray = image
-		blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
-		thresh = cv2.threshold(blurred, Thmin, Thmax, cv2.THRESH_BINARY)[1]
-
-		cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-		cv2.CHAIN_APPROX_SIMPLE)
-		cnts = imutils.grab_contours(cnts)
-		ratio =1
-		boxes = []
-		#img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-		j=0
-		mul_coef = 1
-		cX = 0
-		cY = 0
-		for i,c in enumerate(cnts):
-			# compute the center of the contour, then detect the name of the
-			# shape using only the contour
-			M = cv2.moments(c)
-			if M["m00"] != 0:
-				cX = int((M["m10"] / M["m00"]) * ratio)
-				cY = int((M["m01"] / M["m00"]) * ratio)
-			# multiply the contour (x, y)-coordinates by the resize ratio,
-			# then draw the contours and the name of the shape on the image
-			c = c.astype("float")
-			c *= ratio
-			c = c.astype("int")
-			contour_area = cv2.contourArea(c)
-			if contour_area < 190 or contour_area > 2400:
-				continue
-			#print(f"{i} : area = {contour_area}")
-			peri = cv2.arcLength(c, True)
-			c = cv2.approxPolyDP(c, 0.020 * peri, True)
-			# rotated rect constructor
-			rect = cv2.minAreaRect(c)
+		# #gray = image
+		# blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
+		# thresh = cv2.threshold(blurred, Thmin, Thmax, cv2.THRESH_BINARY)[1]
+		
+		# image_blur = cv2.medianBlur(thresh, 25)
 			
-			box = np.int0(cv2.boxPoints(rect))
-			#print(f"recr = {box}")
-			#-------------------------
-			
-			print(f"object {j+1}:")
-			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(1), (int(box[0][0] + (box[1][0] - box[0][0])/2),int(box[0][1] + (box[1][1] - box[0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-			fontScale=0.5, color=(255,255,255))
-			self.secondWindow.auto_lines.append([box[0],box[1]])
-			print(f"{self.letter_dict[j]*mul_coef}1 : {round(self.straight_determine_line([box[0],box[1]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(2), (int(box[1][0] + (box[2][0] - box[1][0])/2),int(box[1][1] + (box[2][1] - box[1][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-			fontScale=0.5, color=(255,255,255))
-			self.secondWindow.auto_lines.append([box[1],box[2]])
-			print(f"{self.letter_dict[j]*mul_coef}2 : {round(self.straight_determine_line([box[1],box[2]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(3), (int(box[2][0] + (box[3][0] - box[2][0])/2),int(box[2][1] + (box[3][1] - box[2][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-			fontScale=0.5, color=(255,255,255))
-			self.secondWindow.auto_lines.append([box[2],box[3]])
-			print(f"{self.letter_dict[j]*mul_coef}3 : {round(self.straight_determine_line([box[2],box[3]]), 2)} mm")
-			cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(4), (int(box[3][0] + (box[0][0] - box[3][0])/2),int(box[3][1] + (box[0][1] - box[3][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-			fontScale=0.5, color=(255,255,255))
-			self.secondWindow.auto_lines.append([box[3],box[0]])
-			print(f"{self.letter_dict[j]*mul_coef}4 : {round(self.straight_determine_line([box[3],box[0]]), 2)} mm")
-			image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
-			j=j+1
+		# image_res, thresh = cv2.threshold(image_blur, 240,255, cv2.THRESH_BINARY_INV)
 
-			if self.letter_dict[j] == 'z':
-				j=0
-				mul_coef = mul_coef + 1
+		# cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+		# cv2.CHAIN_APPROX_SIMPLE)
+		# cnts = imutils.grab_contours(cnts)
+		# ratio =1
+		# boxes = []
+		# #img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+		# j=0
+		# mul_coef = 1
+		# cX = 0
+		# cY = 0
+		# for i,c in enumerate(cnts):
+		# 	# compute the center of the contour, then detect the name of the
+		# 	# shape using only the contour
+		# 	M = cv2.moments(c)
+		# 	if M["m00"] != 0:
+		# 		cX = int((M["m10"] / M["m00"]) * ratio)
+		# 		cY = int((M["m01"] / M["m00"]) * ratio)
+		# 	# multiply the contour (x, y)-coordinates by the resize ratio,
+		# 	# then draw the contours and the name of the shape on the image
+		# 	c = c.astype("float")
+		# 	c *= ratio
+		# 	c = c.astype("int")
+		# 	contour_area = cv2.contourArea(c)
+		# 	if contour_area < 150:
+		# 		continue
+		# 	#print(f"{i} : area = {contour_area}")
+		# 	peri = cv2.arcLength(c, True)
+		# 	c = cv2.approxPolyDP(c, 0.020 * peri, True)
+		# 	# rotated rect constructor
+		# 	rect = cv2.minAreaRect(c)
+			
+		# 	box = np.int0(cv2.boxPoints(rect))
+		# 	#print(f"recr = {box}")
+		# 	#-------------------------
+		# 	print(f"object {j+1}:")
+		# 	# for printing all lines of object
+		# 	for k in range(4):
+		# 		last = k+1
+		# 		if last ==4:
+		# 			last = 0			
+		# 		cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+		# 		fontScale=0.5, color=(255,255,255))
+		# 		self.secondWindow.auto_lines.append([box[k],box[last]])
+		# 		print(f"{self.letter_dict[j]*mul_coef}{k+1} : {round(self.straight_determine_line([box[k],box[last]]), 2)} mm")
+		# 	image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
+		# 	j=j+1
+
+		# 	if self.letter_dict[j] == 'z':
+		# 		j=0
+		# 		mul_coef = mul_coef + 1
+		_, mask_frame, thresh = autoFindRect(image, hsv_frame, self, True)
 			
 		return image
 
 
 	# Основная функция в котором работает наше окно
 	def run(self):
-		# Двойное изображение
-		#imageToDisp = self.imageToDisp[self.index]
-
-		
-
-		# Калибровка и разделение изображений на левое и правое
-		# ~ imgL, imgR = calibrate_two_images(imageToDisp)
-		# ~ rectified_pair = (imgL, imgR)
-
 		# Флаг для перерисовывания графа(для возможности рисовать на нем)
 		a_id = None
 		# Сам граф
@@ -272,7 +235,7 @@ class Interface(baseInterface):
 
 		# The PSG "Event Loop"
 		for frame in self.camera.capture_continuous(self.capture, format="bgra", use_video_port=True, resize=(self.cam_width,self.cam_height)):                     
-		#while True:
+			
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
 
 			if event is None or event == self.sg.WIN_CLOSED or event == 'Cancel':  
@@ -292,8 +255,7 @@ class Interface(baseInterface):
 			# ~ rectified_pair = (imgR, imgL)
 			
 			try:
-
-				#disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 				
 				if event == 'auto-lineFinder':
 					self.window.FindElement("_output_").Update('')
@@ -334,7 +296,12 @@ class Interface(baseInterface):
 
 			# Обработчики событий
 			# ---------------------
-
+			
+			if event == "build 3DpointsCloud":
+				disparity, points_3, colors = create_points_cloud((imgL, imgR), self.parameters)
+			
+			if event == "Show 3D-Points":
+				os.system("meshlab output.ply")
 
 			
 			# Save settings to file
@@ -364,18 +331,7 @@ class Interface(baseInterface):
 					self.window.FindElement("_output_").Update('')
 					print("ERROR:Firstly create disparity map!")
 					print(traceback.format_exc()) 
-			
-			
 
-			# Нажатие на кнопку "Следующая картинка"
-			# ~ if event == "Next Picture ->":
-				# ~ self.index = self.index + 1
-				# ~ if self.index >= len(self.imageToDisp):
-					# ~ self.index=0
-				# ~ imageToDisp = self.imageToDisp[self.index] 
-				# ~ imgL, imgR = calibrate_two_images(imageToDisp)
-				# ~ rectified_pair = (imgL, imgR)
-				# ~ #pass
 
 			# События рисования на графе нажатием кнопки мыши
 			if event == "graph":

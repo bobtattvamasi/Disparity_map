@@ -3,6 +3,7 @@ import numpy as np
 import json
 from datetime import datetime
 import time
+from measurements_values import defaultValues
 
 # Depth Map colors autotune
 autotune_min = 10000000
@@ -34,7 +35,6 @@ def load_map_settings(sbm, parameters):
 	TTH = parameters['TxtrThrshld']
 	UR = parameters['UnicRatio']
 	SR = parameters['SpcklRng']
-	SWS = parameters['SWS']
 
 	sbm.setPreFilterType(1)
 	sbm.setPreFilterSize(PFS)
@@ -114,7 +114,7 @@ def rotate(arr, anglex, anglez):
 		[-np.sin(anglez), 0, np.cos(anglez)]
 	])).dot(arr)
 
-def write_ply(fn, verts, colors):
+def write_ply(fn, verts, colors,ply_header):
 	verts = verts.reshape(-1, 3)
 	colors = colors.reshape(-1, 3)
 	verts = np.hstack([verts, colors])
@@ -126,7 +126,7 @@ def write_ply(fn, verts, colors):
 
 
 
-def create_points_cloud(img_path, parameters):
+def create_points_cloud(rectified_pair, parameters):
 	ply_header = '''ply
 	format ascii 1.0
 	element vertex %(vert_num)d
@@ -140,8 +140,8 @@ def create_points_cloud(img_path, parameters):
 	'''
 
 	# Camera settimgs
-	img_width = 3840
-	img_height = 1088
+	img_width = defaultValues.IMAGE_WIDTH
+	img_height = defaultValues.IMAGE_HEIGHT
 
 	# Image for disparity
 
@@ -156,14 +156,14 @@ def create_points_cloud(img_path, parameters):
 
 	# Loading stereoscopic calibration data
 	try:
-		npzfile = np.load('./calibration_data/{}p/stereo_camera_calibration.npz'.format(img_height))
+		npzfile = np.load('./data/calibration_data/{}p/stereo_camera_calibration.npz'.format(img_height))
 	except:
-		print("Camera calibration data not found in cache, file ", './calibration_data/{}p/stereo_camera_calibration.npz'.format(img_height))
+		print("Camera calibration data not found in cache, file ", './data/calibration_data/{}p/stereo_camera_calibration.npz'.format(img_height))
 		exit(0)
 	try:
-		npzright = np.load('./calibration_data/{}p/camera_calibration_right.npz'.format(img_height))
+		npzright = np.load('./data/calibration_data/{}p/camera_calibration_right.npz'.format(img_height))
 	except:
-		print("Camera calibration data not found in cache, file ", './calibration_data/{}p/camera_calibration_right.npz'.format(img_height))
+		print("Camera calibration data not found in cache, file ", './data/calibration_data/{}p/camera_calibration_right.npz'.format(img_height))
 		exit(0)  
 
 	imageSize = tuple(npzfile['imageSize'])
@@ -174,8 +174,8 @@ def create_points_cloud(img_path, parameters):
 	QQ = npzfile['dispartityToDepthMap']
 	right_K = npzright['camera_matrix']
 
-	map_width = 1920
-	map_height = 1088
+	map_width = 1280
+	map_height = 720
 
 	min_y = 10000
 	max_y = -10000
@@ -194,13 +194,16 @@ def create_points_cloud(img_path, parameters):
 	r = np.eye(3)
 	t = np.array([0, 0.0, 100.5])
 
-	imageToDisp = img_path#'./scenes4test/scene_3840x1088_20.png'
+	# ~ imageToDisp = img_path#'./scenes4test/scene_3840x1088_20.png'
 
-	pair_img = cv2.imread(imageToDisp,0)
+	# ~ pair_img = cv2.imread(imageToDisp,0)
 	
 	# Cutting stereopair to the left and right images
-	imgLeft = pair_img [0:img_height,0:int(img_width/2)] #Y+H and X+W
-	imgRight = pair_img [0:img_height,int(img_width/2):img_width] #Y+H and X+W
+	# ~ imgLeft = pair_img [0:img_height,0:int(img_width/2)] #Y+H and X+W
+	# ~ imgRight = pair_img [0:img_height,int(img_width/2):img_width] #Y+H and X+W
+	
+	imgLeft = rectified_pair[0]
+	imgRight = rectified_pair[1]
 	
 	# Undistorting images
 	imgL = cv2.remap(imgLeft, leftMapX, leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
@@ -217,6 +220,8 @@ def create_points_cloud(img_path, parameters):
 	# 	# if points[0]==201:
 	# 	# 	if points[1] == 246:
 	# 	print(f"points_3 = {points}")
+	
+	write_ply("output.ply", points_3, colors, ply_header)
 
 	return disparity, points_3, colors
 

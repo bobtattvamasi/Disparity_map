@@ -1,11 +1,11 @@
-lowH,0
+lowH,108
 highH,179
-lowS,99
+lowS,0
 highS,255
-lowV,133
+lowV,95
 highV,255
 minVal,50
 maxVal,200
 layer,0
-Thmin,60
+Thmin,242
 Thmax,255
