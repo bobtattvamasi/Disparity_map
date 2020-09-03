@@ -375,9 +375,9 @@ class Interface(baseInterface):
 						for i in range(0, len(self.secondWindow.auto_lines), 4):
 							print(f"Object {int(i/4) + 1}")
 							for j in range(4):
-								box0,box1 = self.secondWindow.auto_lines[i+j]
+								box0,box1 = self.secondWindow.auto_lines[k+j]
 								print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(self.straight_determine_line([box0,box1]), 2)} mm")
-							if self.letter_dict[k] == 'z':
+							if self.letter_dict[k] == 'Z':
 								k=0
 								mul_coef = mul_coef + 1
 								continue

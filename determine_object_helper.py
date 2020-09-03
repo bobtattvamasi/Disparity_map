@@ -88,13 +88,18 @@ def calibrate_two_images(imageToDisp, ifCamPi = True, photoDim=None, imageDim=No
 	imgL = cv2.remap(imgLeft, leftMapX, leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 	imgR = cv2.remap(imgRight, rightMapX, rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
-	imgRs = cv2.resize (imgR, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
-	imgLs = cv2.resize (imgL, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+	# imgRs = cv2.resize (imgR, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+	# imgLs = cv2.resize (imgL, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
 	#print(f"left = {imgLs.shape}, right = {imgRs.shape}")
 
 	#cv2.imshow("right", imgRs)
 	#cv2.imshow("left", imgLs)
 	#cv2.waitKey(0)
+	return imgL, imgR
+
+def resize_rectified_pair(rectified_pair):
+	imgRs = cv2.resize (rectified_pair[1], dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+	imgLs = cv2.resize (rectified_pair[0], dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
 	return imgLs, imgRs
 
 autotune_min = 10000000
@@ -121,12 +126,15 @@ def stereo_depth_map(rectified_pair, parameters):
 	local_min = disparity.min()
 
 	global autotune_max, autotune_min
-	autotune_max = max(autotune_max, disparity.max())
-	autotune_min = min(autotune_min, disparity.min())
+	# autotune_max = max(autotune_max, disparity.max())
+	# autotune_min = min(autotune_min, disparity.min())
+	autotune_max = local_max
+	autotune_min = local_min
 
 	disparity_grayscale = (disparity-autotune_min)*(65535.0/(autotune_max-autotune_min))
 	disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
 	disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
+	#print(f"disparity size = {disparity_color.shape}")
 	return disparity_color,  disparity.astype(np.float32) / 16.0
 
 # Функция возвращает карту шлубин по калиброванным стереофото

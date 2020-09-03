@@ -17,7 +17,6 @@ class autoDetectRectWin(baseInterface):
 		
 		
 		self.TextForApp = TextForApp
-		window = None
 
 		
 

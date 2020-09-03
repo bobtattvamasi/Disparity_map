@@ -18,8 +18,10 @@ def stereo_depth_map(sbm, rectified_pair):
 	#print(local_max, local_min)
 	# "Jumping colors" protection for depth map visualization
 	global autotune_max, autotune_min
-	autotune_max = max(autotune_max, disparity.max())
-	autotune_min = min(autotune_min, disparity.min())
+	# autotune_max = max(autotune_max, disparity.max())
+	# autotune_min = min(autotune_min, disparity.min())
+	autotune_max = local_max
+	autotune_min = local_min
 
 	disparity_grayscale = (disparity-autotune_min)*(65535.0/(autotune_max-autotune_min))
 	disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
@@ -126,7 +128,7 @@ def write_ply(fn, verts, colors,ply_header):
 
 
 
-def create_points_cloud(rectified_pair, parameters):
+def create_points_cloud(imageToDisp, parameters):
 	ply_header = '''ply
 	format ascii 1.0
 	element vertex %(vert_num)d
@@ -140,13 +142,9 @@ def create_points_cloud(rectified_pair, parameters):
 	'''
 
 	# Camera settimgs
-	img_width = defaultValues.IMAGE_WIDTH
-	img_height = defaultValues.IMAGE_HEIGHT
+	img_width = defaultValues.PHOTO_WIDTH
+	img_height = defaultValues.PHOTO_HEIGHT
 
-	# Image for disparity
-
-
-	
 
 	disparity = np.zeros((img_width, img_height), np.uint8)
 	sbm = cv2.StereoBM_create(numDisparities=0, blockSize=21)
@@ -174,8 +172,8 @@ def create_points_cloud(rectified_pair, parameters):
 	QQ = npzfile['dispartityToDepthMap']
 	right_K = npzright['camera_matrix']
 
-	map_width = 1280
-	map_height = 720
+	map_width = defaultValues.IMAGE_WIDTH
+	map_height = defaultValues.IMAGE_HEIGHT
 
 	min_y = 10000
 	max_y = -10000
@@ -196,14 +194,14 @@ def create_points_cloud(rectified_pair, parameters):
 
 	# ~ imageToDisp = img_path#'./scenes4test/scene_3840x1088_20.png'
 
-	# ~ pair_img = cv2.imread(imageToDisp,0)
+	pair_img = cv2.imread(imageToDisp,0)
 	
 	# Cutting stereopair to the left and right images
-	# ~ imgLeft = pair_img [0:img_height,0:int(img_width/2)] #Y+H and X+W
-	# ~ imgRight = pair_img [0:img_height,int(img_width/2):img_width] #Y+H and X+W
+	imgLeft = pair_img [0:img_height,0:int(img_width/2)] #Y+H and X+W
+	imgRight = pair_img [0:img_height,int(img_width/2):img_width] #Y+H and X+W
 	
-	imgLeft = rectified_pair[0]
-	imgRight = rectified_pair[1]
+	# imgLeft = rectified_pair[0]
+	# imgRight = rectified_pair[1]
 	
 	# Undistorting images
 	imgL = cv2.remap(imgLeft, leftMapX, leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)

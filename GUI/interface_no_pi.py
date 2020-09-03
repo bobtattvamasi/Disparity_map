@@ -7,16 +7,16 @@ import math
 #import picamera
 #from picamera import PiCamera
 import numpy as np
-import string
 import imutils
 
 # Imports from files
 from GUI.baseInterface import baseInterface
 from measurements_values import defaultValues
 from point_cloud import stereo_depth_map as depth_map, create_points_cloud
-from determine_object_helper import convert_to_bytes, calibrate_two_images, stereo_depth_map, contours_finder, autoFindRect
+from determine_object_helper import convert_to_bytes, calibrate_two_images, stereo_depth_map, contours_finder, autoFindRect, resize_rectified_pair
 from GUI.tools_for_intaface import *
 from GUI.autoDetectRectWin import autoDetectRectWin
+from GUI.threedPointCloudWin import ThreeDPointCloudWin
 #from FPS_test import PiVideoStream
 
 
@@ -53,7 +53,9 @@ class Interface(baseInterface):
 		# из файла .csv
 		self.parameters = read_csv("db/settings.csv")
 
+		# Дополнительные окна настроек
 		self.secondWindow = autoDetectRectWin("DarkAmber", 'Auto Detecting Rectangles')
+		self.Window3D = ThreeDPointCloudWin("DarkAmber", "3D Point Cloud Builder")
 
 		# Переменная для хранения линий
 		# с автоопределения прямоугольников
@@ -122,7 +124,7 @@ class Interface(baseInterface):
 			# Вывод всей важной информации происходит здесь
 			[self.sg.Output(size=(64, 21), key = '_output_')],
 			[self.sg.Button('lineFinder Settings', size=(15,2)), self.sg.Button('auto-lineFinder', size=(15,2))],
-			[self.sg.Button('build 3DpointsCloud', size=(15,2)), self.sg.Button('Show 3D-Points', size=(15,2))]
+			[self.sg.Button('3DCloud Settings', size=(15,2)), self.sg.Button('Show 3D-Points', size=(15,2))]
 			
 		]
 
@@ -140,100 +142,14 @@ class Interface(baseInterface):
 	def lineFinder(self, image):
 		hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 		self.secondWindow.auto_lines = []
-		
-		# minVal = 50
-		# maxVal = 200
-		# layer = 0
-
-		# Thmin = self.secondWin_parameters["Thmin"]
-		# Thmax = self.secondWin_parameters["Thmax"]
-
-		# hsv_min = np.array((self.secondWin_parameters["lowH"], self.secondWin_parameters["lowS"], self.secondWin_parameters["lowV"]), np.uint8)
-		# hsv_max = np.array((self.secondWin_parameters["highH"], self.secondWin_parameters["highS"], self.secondWin_parameters["highV"]), np.uint8)
-		
-		# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-		# height, width = gray.shape
-		# # mask = np.zeros((height,width))
-		# # cv2.rectangle(mask, (100,60), (460,355), 255, -1)
-		# # #masked_data = cv2.bitwise_and(gray, gray, mask=mask)
-		# # gray[mask < 255] = 0
-		# # hsv_frame[mask < 255] = 0
-		# mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
-		# #img = image[140:355, 80:460]
-		# second_inRange = cv2.inRange(image, np.array([0,0,0]), np.array([16,50,255]))
-		
-		# #gray = image
-		# blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
-		# thresh = cv2.threshold(blurred, Thmin, Thmax, cv2.THRESH_BINARY)[1]
-
-		# cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-		# cv2.CHAIN_APPROX_SIMPLE)
-		# cnts = imutils.grab_contours(cnts)
-		# ratio =1
-		# #img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-		# j=0
-		# mul_coef = 1
-		# cX = 0
-		# cY = 0
-		# for i,c in enumerate(cnts):
-		# 	# compute the center of the contour, then detect the name of the
-		# 	# shape using only the contour
-		# 	M = cv2.moments(c)
-		# 	if M["m00"] != 0:
-		# 		cX = int((M["m10"] / M["m00"]) * ratio)
-		# 		cY = int((M["m01"] / M["m00"]) * ratio)
-		# 	# multiply the contour (x, y)-coordinates by the resize ratio,
-		# 	# then draw the contours and the name of the shape on the image
-		# 	c = c.astype("float")
-		# 	c *= ratio
-		# 	c = c.astype("int")
-		# 	contour_area = cv2.contourArea(c)
-		# 	if contour_area < 190 or contour_area > 2400:
-		# 		continue
-		# 	#print(f"{i} : area = {contour_area}")
-		# 	peri = cv2.arcLength(c, True)
-		# 	c = cv2.approxPolyDP(c, 0.020 * peri, True)
-		# 	# rotated rect constructor
-		# 	rect = cv2.minAreaRect(c)
-			
-		# 	box = np.int0(cv2.boxPoints(rect))
-		# 	#print(f"recr = {box}")
-		# 	#-------------------------
-			
-		# 	print(f"object {j+1}:")
-		# 	cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(1), (int(box[0][0] + (box[1][0] - box[0][0])/2),int(box[0][1] + (box[1][1] - box[0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-		# 	fontScale=0.5, color=(255,255,255))
-		# 	self.secondWindow.auto_lines.append([box[0],box[1]])
-		# 	print(f"{self.letter_dict[j]*mul_coef}1 : {round(self.straight_determine_line([box[0],box[1]]), 2)} mm")
-		# 	cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(2), (int(box[1][0] + (box[2][0] - box[1][0])/2),int(box[1][1] + (box[2][1] - box[1][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-		# 	fontScale=0.5, color=(255,255,255))
-		# 	self.secondWindow.auto_lines.append([box[1],box[2]])
-		# 	print(f"{self.letter_dict[j]*mul_coef}2 : {round(self.straight_determine_line([box[1],box[2]]), 2)} mm")
-		# 	cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(3), (int(box[2][0] + (box[3][0] - box[2][0])/2),int(box[2][1] + (box[3][1] - box[2][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-		# 	fontScale=0.5, color=(255,255,255))
-		# 	self.secondWindow.auto_lines.append([box[2],box[3]])
-		# 	print(f"{self.letter_dict[j]*mul_coef}3 : {round(self.straight_determine_line([box[2],box[3]]), 2)} mm")
-		# 	cv2.putText(image, str(self.letter_dict[j]*mul_coef)+str(4), (int(box[3][0] + (box[0][0] - box[3][0])/2),int(box[3][1] + (box[0][1] - box[3][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-		# 	fontScale=0.5, color=(255,255,255))
-		# 	self.secondWindow.auto_lines.append([box[3],box[0]])
-		# 	print(f"{self.letter_dict[j]*mul_coef}4 : {round(self.straight_determine_line([box[3],box[0]]), 2)} mm")
-		# 	image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
-		# 	j=j+1
-
-		# 	if self.letter_dict[j] == 'z':
-		# 		j=0
-		# 		mul_coef = mul_coef + 1
-		_, mask_frame, thresh = autoFindRect(image, hsv_frame, self, True)
-			
+		_, mask_frame, thresh = autoFindRect(image, hsv_frame, self, True)	
 		return image
 
 
 	# Основная функция в котором работает наше окно
 	def run(self):
 		# Двойное изображение
-		imageToDisp = self.imageToDisp[self.index]
-
-		
+		imageToDisp = self.imageToDisp[self.index]		
 
 		# Калибровка и разделение изображений на левое и правое
 		imgL, imgR = calibrate_two_images(imageToDisp, False)
@@ -249,7 +165,7 @@ class Interface(baseInterface):
 		start_point, end_point = None, None
 		start_p, end_p = None, None
 		lines =[]
-		disparity = np.zeros((362, 640), np.uint8)
+		disparity_to_show = np.zeros((362, 640), np.uint8)
                 
 		while True:
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
@@ -272,7 +188,7 @@ class Interface(baseInterface):
 			
 			try:
 
-				#disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 				
 				if event == 'auto-lineFinder':
 					self.window.FindElement("_output_").Update('')
@@ -289,7 +205,8 @@ class Interface(baseInterface):
 				# Перерисовка графа
 				if a_id:
 					graph.DeleteFigure(a_id)
-				a_id = graph.DrawImage(data=cv2.imencode('.png', disparity)[1].tobytes(), location=(0, 362))
+				disparity_to_show = cv2.resize(disparity, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+				a_id = graph.DrawImage(data=cv2.imencode('.png', disparity_to_show)[1].tobytes(), location=(0, 362))
 				# Рисовние линий
 				for i,line in enumerate(lines):
 					if line[0] is not None and line[1] is not None:
@@ -305,7 +222,8 @@ class Interface(baseInterface):
 				#
 
 				# Update image in window
-				self.window.FindElement('image').Update(data=cv2.imencode('.png', imgL)[1].tobytes())
+				imageL,ImageR = resize_rectified_pair(rectified_pair)
+				self.window.FindElement('image').Update(data=cv2.imencode('.png', imageL)[1].tobytes())
 
 			except IndexError:
 				print(traceback.format_exc()) 
@@ -314,8 +232,14 @@ class Interface(baseInterface):
 			# Обработчики событий
 			# ---------------------
 
-			if event == "build 3DpointsCloud":
-				disparity, points_3, colors = create_points_cloud((imgL, imgR), self.parameters)
+			if event == "3DCloud Settings":
+				try:
+					#disparity, points_3, colors = create_points_cloud(imageToDisp, self.parameters)
+					self.Window3D.run(imageToDisp, self.parameters)
+				except:
+					self.window.FindElement("_output_").Update('')
+					print("ERROR:Firstly create disparity map!")
+					print(traceback.format_exc()) 
 			
 			if event == "Show 3D-Points":
 				os.system("meshlab output.ply")
