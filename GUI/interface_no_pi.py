@@ -44,12 +44,8 @@ class Interface(baseInterface):
 		# Camera settimgs
 		self.cam_width = 2560
 		self.cam_height = 720
-		
 
-		# Создаем словарь параметров для настройки карты глубины,
-		# которые ниже можно будет регулировать через ползунки.
-		#self.parameters = {}
-		# Считываем значения параметров 
+		# Считываем значения параметров(Ползунки)
 		# из файла .csv
 		self.parameters = read_csv("db/settings.csv")
 
@@ -66,16 +62,7 @@ class Interface(baseInterface):
 		# прямоугольных  объектов.
 		self.secondWin_parameters = read_csv("db/secondWin.csv")
 
-		# Словарь букв для отображения линий
-		
-
-		# self.secondWin_parameters = {"lowH":0,
-		# 				"highH":179,
-		# 				"lowS":99,
-		# 				"highS":255,
-		# 				"lowV":133,
-		# 				"highV":255}
-
+		self.disparity_value = None
 
 		# --------------------------------------------
 		# Разделяем пространство окна на левое и правое
@@ -137,6 +124,8 @@ class Interface(baseInterface):
 		self.window = self.sg.Window(TextForApp, 
 						layout, icon=self.icon, resizable=True)
 
+		self.pointcloud = None
+
 		
 		
 	def lineFinder(self, image):
@@ -165,7 +154,10 @@ class Interface(baseInterface):
 		start_point, end_point = None, None
 		start_p, end_p = None, None
 		lines =[]
+		lines_for_view = []
 		disparity_to_show = np.zeros((362, 640), np.uint8)
+
+		disparity = np.zeros((720,1280), np.uint8)
                 
 		while True:
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
@@ -176,24 +168,19 @@ class Interface(baseInterface):
 			#imageToDisp = self.vs.read()
 			
 			#imageToDisp = frame
-			#imgLeft = frame [0:362,0:640]
-			#print(f"frame = {imageToDisp.shape}")
-			#leftI = frame[0:720, 0:1280]
-			#leftI = cv2.resize(leftI, (640,362))
-			#rightI = imageToDisp[0:720, 1280:2560]
-			#rightI = cv2.resize(rightI, (640,362))
 
 			imgL, imgR = calibrate_two_images(imageToDisp, False)
 			# ~ rectified_pair = (imgR, imgL)
 			
 			try:
 
-				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+				#disparity, self.disparity_value = self.deepMap_updater(imageToDisp, values)
 				
 				if event == 'auto-lineFinder':
 					self.window.FindElement("_output_").Update('')
 					try:
 						disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+						self.pointcloud = self.Window3D.forFormula(imageToDisp, self.parameters, ifCamPi=False)
 						disparity = self.lineFinder(disparity)
 					except:
 						print("find lines dont work")
@@ -208,7 +195,8 @@ class Interface(baseInterface):
 				disparity_to_show = cv2.resize(disparity, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
 				a_id = graph.DrawImage(data=cv2.imencode('.png', disparity_to_show)[1].tobytes(), location=(0, 362))
 				# Рисовние линий
-				for i,line in enumerate(lines):
+				print(f"len={len(lines_for_view)}"
+				for i,line in enumerate(lines_for_view):
 					if line[0] is not None and line[1] is not None:
 						
 						graph.DrawLine((line[0][0],line[0][1]), (line[1][0], line[1][1]), color='purple', width=3)
@@ -235,7 +223,7 @@ class Interface(baseInterface):
 			if event == "3DCloud Settings":
 				try:
 					#disparity, points_3, colors = create_points_cloud(imageToDisp, self.parameters)
-					self.Window3D.run(imageToDisp, self.parameters)
+					self.Window3D.run(imageToDisp, self.parameters, ifCamPi=False)
 				except:
 					self.window.FindElement("_output_").Update('')
 					print("ERROR:Firstly create disparity map!")
@@ -253,6 +241,7 @@ class Interface(baseInterface):
 			if event == "clear lines":
 				try:
 					lines = []
+					lines_for_view = []
 					self.secondWindow.auto_lines = []
 					disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 					graph.TKCanvas.delete('all')
@@ -289,6 +278,8 @@ class Interface(baseInterface):
 			if event == "graph":
 				x,y = values["graph"]
 				#print (f"mouse down at ({x},{y})")
+				print(f"disparity = {self.disparity_value[int(y*720/362)][int(x*1280/640)]}")
+				#x,y = int(x*1280/640), int(y*720/362)
 				if not dragging:
 					start_p = (x,y)
 					dragging = True
@@ -299,15 +290,18 @@ class Interface(baseInterface):
 				start_point = start_p
 				end_point = end_p
 				print(f"grabbed rectangle from {start_point} to {end_point}")
+				print(f"grabbed rectangle from {[int(start_p[0]*1280/640), int((abs(start_p[1]-362))*720/362)]} to {[int(end_p[0]*1280/640), int((abs(end_p[1]-362))*720/362)]}")
 				if start_p != None or end_p != None or [start_p, end_p] != None:
-					lines.append([start_p, end_p])
+					lines.append([[int(start_p[0]*1280/640), int((abs(start_p[1]-362))*720/362)], [int(end_p[0]*1280/640), int((abs(end_p[1]-362))*720/362)]])
+					lines_for_view.append([start_p, end_p])
 				start_p, end_p = None, None
 				dragging = False
 
 			#print(lines)
 			
 			if event == 'create map':
-				disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+				disparity, self.disparity_value = self.deepMap_updater(imageToDisp, values)
+				self.pointcloud = self.Window3D.forFormula(imageToDisp, self.parameters, ifCamPi=False)
 				#self.secondWindow.auto_lines = []
 				#lines = []
 				self.window.FindElement("_output_").Update('')
@@ -317,42 +311,40 @@ class Interface(baseInterface):
 			# наименования граней и их размеры(Для линий которые мы сами нарисовали).
 			if event == 'find distances':
 				try:
-					if len(lines) == 0 and len(self.secondWindow.auto_lines) == 0:
-						self.window.FindElement("_output_").Update('')
-						print("No lines that I can to find.")
-					else:
-						self.window.FindElement("_output_").Update('')
-						mul_coef = 1
-						k=0
-						print(len(self.secondWindow.auto_lines))
-						for i in range(0, len(self.secondWindow.auto_lines), 4):
-							print(f"Object {int(i/4) + 1}")
-							for j in range(4):
-								box0,box1 = self.secondWindow.auto_lines[k+j]
-								print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(self.straight_determine_line([box0,box1]), 2)} mm")
-							if self.letter_dict[k] == 'Z':
-								k=0
-								mul_coef = mul_coef + 1
-								continue
-							k = k+1
-
-							
-							
-
-						for i in range(len(lines)):
-							if lines[i] == None:
-								del lines[i]
-							elif lines[i][0] == None or lines[i][1] == None:
-								del lines[i]
-						#print(f"lines2 = {lines}")
-						
-						for i,line in enumerate(lines):
-							#line_size = self.determine_line(value_disparity, line)
-							line_size = self.straight_determine_line(line)
-							print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
+					self.findAllDistances(self.determine_line, lines, self.disparity_value)
 				except:
 					print("'find distances' dont work")
 					print(traceback.format_exc())
+
+	def findAllDistances(self, func, lines, value_disparity= None):
+		if len(lines) == 0 and len(self.secondWindow.auto_lines) == 0:
+			self.window.FindElement("_output_").Update('')
+			print("No lines that I can to find.")
+		else:
+			self.window.FindElement("_output_").Update('')
+			mul_coef = 1
+			k=0
+			for i in range(0, len(self.secondWindow.auto_lines), 4):
+				print(f"Object {int(i/4) + 1}")
+				for j in range(4):
+					box0,box1 = self.secondWindow.auto_lines[k+j]
+					print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(func(value_disparity, [box0,box1]), 2)} mm")
+				if self.letter_dict[k] == 'Z':
+					k=0
+					mul_coef = mul_coef + 1
+					continue
+				k = k+1
+				
+			for i in range(len(lines)):
+				if lines[i] == None:
+					del lines[i]
+				elif lines[i][0] == None or lines[i][1] == None:
+					del lines[i]
+			
+			for i,line in enumerate(lines):
+				#line_size = self.determine_line(value_disparity, line)
+				line_size = func(value_disparity, line)
+				print(f"\n{self.letter_dict[i]} : {round(line_size,2)} mm")
 
 	def deepMap_updater(self,imageToDisp, values):
 		imgL, imgR = calibrate_two_images(imageToDisp, ifCamPi=False)
@@ -369,16 +361,28 @@ class Interface(baseInterface):
 
 		return stereo_depth_map(rectified_pair, self.parameters)
 
+	# def determine_line(self, disparity_map, line, baseline=0.065, focal=1442, rescale=1):
+	# 	A = line[0]
+	# 	B = line[1]
+
+	# 	disp1 = disparity_map[line[0][1]][line[0][0]]
+	# 	disp2 = disparity_map[line[1][1]][line[1][0]]
+	# 	depth1 = baseline *focal/ (rescale * disp1)
+	# 	depth2 = baseline *focal/ (rescale * disp2)
+	# 	print(f"disp1 = {disp1} \n disp2 = {disp2}")
+
+	# 	line_size = abs(math.sqrt(pow(B[0] - A[0], 2) + pow(B[1] - A[1],2) + pow(depth2 - depth1, 2)))/2.65
+
+	# 	return line_size
+
 	def determine_line(self, disparity_map, line, baseline=0.065, focal=1442, rescale=1):
 		A = line[0]
 		B = line[1]
 
-		disp1 = disparity_map[line[0][1]][line[0][0]]
-		disp2 = disparity_map[line[1][1]][line[1][0]]
-		depth1 = baseline *focal/ (rescale * disp1)
-		depth2 = baseline *focal/ (rescale * disp2)
-
-		line_size = abs(math.sqrt(pow(B[0] - A[0], 2) + pow(B[1] - A[1],2) + pow(depth2 - depth1, 2)))
+		points = self.pointcloud
+		Xa,Ya,Za = points[A[1]][A[0]]
+		Xb,Yb,Zb = points[B[1]][B[0]]
+		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))
 
 		return line_size
 	

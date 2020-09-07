@@ -14,6 +14,10 @@ class baseInterface(ABC):
 		layout = []
 		self.window = self.sg.Window(TextForApp, 
 						layout, icon=self.icon, resizable=True)
+		
+		# Methods from another places
+		# ...
+		
 
 	@abstractmethod
 	def run(self):

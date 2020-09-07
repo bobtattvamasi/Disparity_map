@@ -3,7 +3,7 @@ import numpy as np
 import json
 from datetime import datetime
 import time
-from measurements_values import defaultValues
+from config.config import configValues
 
 # Depth Map colors autotune
 autotune_min = 10000000
@@ -142,8 +142,8 @@ def create_points_cloud(imageToDisp, parameters):
 	'''
 
 	# Camera settimgs
-	img_width = defaultValues.PHOTO_WIDTH
-	img_height = defaultValues.PHOTO_HEIGHT
+	img_width = configValues.PHOTO_WIDTH
+	img_height = configValues.PHOTO_HEIGHT
 
 
 	disparity = np.zeros((img_width, img_height), np.uint8)
@@ -172,8 +172,8 @@ def create_points_cloud(imageToDisp, parameters):
 	QQ = npzfile['dispartityToDepthMap']
 	right_K = npzright['camera_matrix']
 
-	map_width = defaultValues.IMAGE_WIDTH
-	map_height = defaultValues.IMAGE_HEIGHT
+	map_width = configValues.IMAGE_WIDTH
+	map_height = configValues.IMAGE_HEIGHT
 
 	min_y = 10000
 	max_y = -10000
