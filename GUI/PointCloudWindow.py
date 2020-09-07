@@ -4,13 +4,13 @@ import imutils
 import time
 from datetime import datetime
 
-from GUI.baseInterface import baseInterface
+from GUI.baseWindow import BaseWindow
 from db.DBtools import *
 # from point_cloud import *
 from tools.determine_object_helper import stereo_depth_map
 
 
-class pointCloudWindow(baseInterface):
+class pointCloudWindow(BaseWindow):
 	def __init__(self, themeStyle, TextForApp):
 		super().__init__(themeStyle, TextForApp)
 

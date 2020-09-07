@@ -2,12 +2,12 @@ import cv2
 import numpy as np
 import imutils
 
-from GUI.baseInterface import baseInterface
+from GUI.baseWindow import BaseWindow
 from db.DBtools import *
 from tools.determine_object_helper import autoFindRect
 
 
-class autoDetectRectWindow(baseInterface):
+class autoDetectRectWindow(BaseWindow):
 	def __init__(self, themeStyle, TextForApp):
 		super().__init__(themeStyle, TextForApp)
 

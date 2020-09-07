@@ -3,7 +3,7 @@ import PySimpleGUI as sg
 import string
 
 # Базовый класс интерфейса
-class baseInterface(ABC):
+class BaseWindow(ABC):
 
 	def __init__(self, themeStyle, TextForApp):
 		self.sg = sg
