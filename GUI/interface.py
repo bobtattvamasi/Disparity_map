@@ -117,6 +117,9 @@ class MainWindow(BaseWindow):
 			]
 		]
 
+		if not self.ifCamPi:
+			left_column.append([self.sg.Button("Next Picture ->", size=(15,2))])
+
 		# Правая колонка:
 		#
 		right_column = [
@@ -234,7 +237,7 @@ class MainWindow(BaseWindow):
 				# Обработчики событий
 				# ---------------------
 
-				if self.ifCamPi:
+				if not self.ifCamPi:
 					# Нажатие на кнопку "Следующая картинка"
 					if event == "Next Picture ->":
 						self.index = self.index + 1
@@ -334,7 +337,7 @@ class MainWindow(BaseWindow):
 				# наименования граней и их размеры(Для линий которые мы сами нарисовали).
 				if event == 'find distances':
 					try:
-						self.findAllDistances(self.determine_line, self.lines, self.disparity_value)
+						self.findAllDistances(self.lines, self.disparity_value)
 					except:
 						print("'find distances' dont work")
 						print(traceback.format_exc())
@@ -353,14 +356,16 @@ class MainWindow(BaseWindow):
 					break
 		else:
 			# Двойное изображение
-			imageToDisp = self.imageToDisp[self.index]
+			
 			while True:
+				imageToDisp = self.imageToDisp[self.index]
 				loop_flag = main_loop(imageToDisp) 
 				if not loop_flag:
 					break
 
-
-	def findAllDistances(self, func, lines, value_disparity= None):
+	# Функция, которая выводит информацию о всех
+	# найденных и нарисованных линий
+	def findAllDistances(self, lines, value_disparity= None):
 		if len(lines) == 0 and len(self.secondWindow.auto_lines) == 0:
 			self.window.FindElement("_output_").Update('')
 			print("No lines that I can find.")
@@ -372,27 +377,23 @@ class MainWindow(BaseWindow):
 				print(f"Object {int(i/4) + 1}")
 				for j in range(4):
 					box0,box1 = self.secondWindow.auto_lines[k+j]
-					print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(func(value_disparity, [box0,box1]), 2)} mm")
+					print(f"{self.letter_dict[k]*mul_coef}{j+1} : {round(self.old_determine_line(value_disparity, [box0,box1]), 2)} mm")
 				if self.letter_dict[k] == 'Z':
 					k=0
 					mul_coef = mul_coef + 1
 					continue
 				k = k+1
 				
-
 			for i in range(len(lines)):
 				if lines[i] == None:
 					del lines[i]
 				elif lines[i][0] == None or lines[i][1] == None:
-					del lines[i]
-			#print(f"lines2 = {lines}")
-			
+					del lines[i]			
 			
 			for i,line in enumerate(lines):
 				if i==0:
 					print("\nLines:")
-				#line_size = self.determine_line(value_disparity, line)
-				line_size = func(value_disparity, line)
+				line_size = self.determine_line(value_disparity, line)
 				print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
 		
 
@@ -412,8 +413,8 @@ class MainWindow(BaseWindow):
 		return stereo_depth_map(rectified_pair, self.parameters)
 
 	def old_determine_line(self, disparity_map, line, baseline=0.065, focal=1442, rescale=1):
-		A = line[0]
-		B = line[1]
+		A = self.boundary_condition(line[0])
+		B = self.boundary_condition(line[1])
 
 		disp1 = disparity_map[line[0][1]][line[0][0]]
 		disp2 = disparity_map[line[1][1]][line[1][0]]
@@ -423,11 +424,19 @@ class MainWindow(BaseWindow):
 		line_size = abs(math.sqrt(pow(B[0] - A[0], 2) + pow(B[1] - A[1],2) + pow(depth2 - depth1, 2)))/2.65
 
 		return line_size
+
+	@staticmethod
+	def boundary_condition(A):
+		if A[1]>=720:
+			A[1] = 719
+		if A[0] >= 1280:
+			A[0]=1279
+		return A
 		
 	
 	def determine_line(self, disparity_map, line, baseline=0.065, focal=1442, rescale=1):
-		A = line[0]
-		B = line[1]
+		A = self.boundary_condition(line[0])
+		B = self.boundary_condition(line[1])
 
 		points = self.pointcloud
 		Xa,Ya,Za = points[A[1]][A[0]]

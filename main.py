@@ -1,11 +1,13 @@
 import sys
-# if len(sys.argv)>1:
-# 	from GUI.interface_no_pi import MainWindow
-# else:
 from GUI.interface import MainWindow
 
 def main():
-	interbox = MainWindow("DarkAmber", 'Demo Determine Line Lenght', False) #if len(sys.argv)==0 else interbox = MainWindow("DarkAmber", 'Demo Determine Line Lenght', ifCamPi=False)
+	interbox = None
+	print(len(sys.argv))
+	if len(sys.argv)==1:
+		interbox = MainWindow("DarkAmber", 'Demo Determine Line Lenght', False) 
+	else:
+		interbox = MainWindow("DarkAmber", 'Demo Determine Line Lenght', True)
 	interbox.run()
 	interbox.close()
 

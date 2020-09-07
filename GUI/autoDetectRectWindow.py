@@ -13,12 +13,7 @@ class autoDetectRectWindow(BaseWindow):
 
 		self.auto_lines = []
 		self.secondWin_parameters = read_csv("db/secondWin.csv")
-
-		
-		
 		self.TextForApp = TextForApp
-
-		
 
 	def run(self, image):
 		left_column = [[self.sg.Image(filename='', key='cube_image'), self.sg.Image(filename='', key='another_image')],

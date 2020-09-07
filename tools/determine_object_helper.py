@@ -285,7 +285,6 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		rect = cv2.minAreaRect(c)
 		
 		box = np.int0(cv2.boxPoints(rect))
-		#print(f"recr = {box}")
 		#-------------------------
 		if ifPrintRect:
 			print(f"object {j+1}:")
@@ -301,15 +300,11 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 				self_.secondWindow.auto_lines.append([box[k],box[last]])
 				#print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.straight_determine_line([box[k],box[last]]), 2)} mm")
 				print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.old_determine_line(self_.disparity_value, [box[k],box[last]]), 2)} mm")
-		# ~ print(f"contou_area = {contour_area}")
-		# ~ print(f"perimetr = {peri}")
 		j=j+1
 		if self_.letter_dict[j] == 'Z':
 			j=0
 			mul_coef = mul_coef + 1
-		
-		
-			
+
 
 		if not ifPrintRect:
 
