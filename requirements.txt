@@ -1,0 +1,11 @@
+PIL
+glob
+numpy
+math
+imutils
+PySimpleGUI
+opencv-python
+base64
+picamera
+typing
+threading

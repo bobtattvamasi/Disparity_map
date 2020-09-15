@@ -5,6 +5,8 @@ class configValues(NamedTuple):
 	PHOTO_HEIGHT = 720 #1088
 	IMAGE_WIDTH = 1280 #1920
 	IMAGE_HEIGHT = 720 #1088
+	WINDOW_WIDTH = 640
+	WINDOW_HEIGHT = 362
 	#folderTestScenes = './data/scenes4test/*.png'
 	#folderTestScenes = './data/objects_high/*.png'
 	#folderTestScenes = './data/objects_low/*.png'
