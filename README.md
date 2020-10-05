@@ -8,26 +8,20 @@ https://github.com/realizator/stereopi-fisheye-robot
 # How to run code?
 ![](https://vision.middlebury.edu/stereo/data/scenes2001/data/anigif/reproj_inv/tsukuba_ri_b.gif 'Да, этот код высчитывает отклонения')
 
-You will need python3; cameraPi as library:
+You will need python3; cameraPi as library and other stuff:
 
 ```bash
-pip install cameraPi
+pip install -r requirements.txt
 
 ```
 
-(requires.txt I create later...)
 
 So if you have a stereocamera enable in your system, so just run code:
 
 ```bash
-python main.py
+python main.py -m 1
 ```
+options:
+m: 0 - working on pictures, 1 - working with video from stereoPiCamera
+d: 0 - depth map created by button, 1 - always
 
-<pre>
-    <kbd>Enter</kbd> - и все должно работать
-</pre> 
-
-# What we wait from future?
-------
-A good 3D reconstruction of scene like on image. But for now it science work...   
-![](https://thumbs.gfycat.com/RedImmenseCony-size_restricted.gif 'просто люблю вставлять гифки во все свои проекты')
