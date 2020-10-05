@@ -13,7 +13,11 @@ class DataBase:
 		reader = csv.reader(open(file_name, 'r'))
 		for row in reader:
 			k,v = row
-			parameters[k] = int(v)
+			
+			if k != 'sigmaColor':
+				parameters[k] = int(v)
+			else:
+				parameters[k] = float(v)
 
 		return parameters
 
@@ -35,6 +39,10 @@ class DataBase:
 		self.mWinParameters['MinDISP'] = int(values[5])
 		self.mWinParameters['PreFiltCap'] = int(values[6]/2)*2+1
 		self.mWinParameters['PFS'] = int(values[7]/2)*2+1
+		# ~ self.mWinParameters['lambda'] = int(values[8])
+		# ~ self.mWinParameters['sigmaColor'] = float(values[9])
+		# ~ self.mWinParameters['Radius'] = int(values[10])
+		# ~ self.mWinParameters['LRCthresh'] = int(values[11])
 
 	def update_aDRWinParameters(self, values):
 

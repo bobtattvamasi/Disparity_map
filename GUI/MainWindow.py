@@ -110,8 +110,13 @@ class MainWindow(BaseWindow):
 			[self.sg.Text("TxtrThrshld"), self.sg.Slider(range=(0, 1000), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["TxtrThrshld"])],
 			[self.sg.Text("NumOfDisp  "), self.sg.Slider(range=(16, 256), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["NumOfDisp"])],
 			[self.sg.Text("MinDISP    "), self.sg.Slider(range=(-300, 300), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["MinDISP"])],
-			[self.sg.Text("PreFiltCap "), self.sg.Slider(range=(5, 63), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["PreFiltCap"])],
+			[self.sg.Text("PreFiltCap "), self.sg.Slider(range=(0, 63), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["PreFiltCap"])],
 			[self.sg.Text("PFS        "), self.sg.Slider(range=(5, 255), orientation='h', size=(34, 10), default_value=self.db.mWinParameters["PFS"])],
+			# ~ [self.sg.Text('_'*25+'DepthFilter'+'_'*20)],
+			# ~ [self.sg.Text("lambda"), self.sg.Slider(range=(0, 10000), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['lambda'])],
+			# ~ [self.sg.Text("SigmaColor"), self.sg.Slider(range=(0.0, 3.0), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['sigmaColor'], resolution=.1)],
+			# ~ [self.sg.Text("Radius"), self.sg.Slider(range=(0, 100), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['Radius'])],
+			# ~ [self.sg.Text("LRCthresh"), self.sg.Slider(range=(0, 300), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['LRCthresh'])],
 			# sg.Combo(['eng', 'rus'], enable_events=True, key='combo'),
 			[self.sg.Button(self.save_settings[self.language], size=(10,1))]
 			])],
@@ -178,13 +183,13 @@ class MainWindow(BaseWindow):
 		self.disparity = np.zeros((cfv.IMAGE_HEIGHT,cfv.IMAGE_WIDTH), np.uint8)
 		
 		
-	def lineFinder(self):
+	def lineFinder(self) -> None:
 		hsv_frame = cv2.cvtColor(self.disparity, cv2.COLOR_BGR2HSV)
 		self.autoFinderWindow.auto_lines = []
 		autoFindRect(self.disparity, hsv_frame, self, True)
 
 	# Основная функция в котором работает наше окно
-	def run(self, ifDebugVersion=False):
+	def run(self, ifDebugVersion=True) -> bool:
 		def main_loop(frame):
 			event, values = self.window.Read(timeout=20, timeout_key='timeout')      # get events for the window with 20ms max wait
 
@@ -201,7 +206,8 @@ class MainWindow(BaseWindow):
 			try:
 				# Если мы хотим что бы карта несоответсвий постоянно обновлялась
 				if ifDebugVersion:
-					self.disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
+					self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
+					self.disparity_value = self.autoFinderWindow.disparity_value
 				
 				# Обновляем граф, рисуя на нем линиями
 				self.drawStraightLine()
@@ -209,6 +215,7 @@ class MainWindow(BaseWindow):
 				# Update image in window
 				imageL,ImageR = resize_rectified_pair(rectified_pair)
 				self.window.FindElement('image').Update(data=cv2.imencode('.png', imageL)[1].tobytes())
+
 
 				#----------------------
 				# Обработчики событий: |
@@ -228,7 +235,8 @@ class MainWindow(BaseWindow):
 				if event == self.auto_lineFinder[self.language]:
 					self.window.FindElement("_output_").Update('')
 					try:
-						self.disparity, self.disparity_value = self.deepMap_updater(imageToDisp, values)
+						self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
+						self.disparity_value = self.autoFinderWindow.disparity_value
 						self.Window3D.updatePointCloud(imageToDisp, self.ifCamPi)
 						self.lineFinder()
 					except:
@@ -245,7 +253,7 @@ class MainWindow(BaseWindow):
 						print(traceback.format_exc()) 
 				
 				# Save settings to file
-				if event == self.save_settings:
+				if event == self.save_settings[self.language]:
 					self.db.save_csv("db/settings.csv", self.db.mWinParameters)
 				
 				# Delete lines from graph image
@@ -283,8 +291,12 @@ class MainWindow(BaseWindow):
 					if not self.dragging:
 						self.start_p = (x,y)
 						self.dragging = True
+						print(f"start z = {self.Window3D.pointcloud[int((abs(y-cfv.WINDOW_HEIGHT))*cfv.IMAGE_HEIGHT/cfv.WINDOW_HEIGHT)][int(x*cfv.IMAGE_WIDTH/cfv.WINDOW_WIDTH)][2]}")
+						print(f"start disparity = {self.disparity_value[int((abs(y-cfv.WINDOW_HEIGHT))*cfv.IMAGE_HEIGHT/cfv.WINDOW_HEIGHT)][int(x*cfv.IMAGE_WIDTH/cfv.WINDOW_WIDTH)]}")
 					else:
 						self.end_p = (x,y)
+						print(f"end z = {self.Window3D.pointcloud[int((abs(y-cfv.WINDOW_HEIGHT))*cfv.IMAGE_HEIGHT/cfv.WINDOW_HEIGHT)][int(x*cfv.IMAGE_WIDTH/cfv.WINDOW_WIDTH)][2]}")
+						print(f"end disparity = {self.disparity_value[int((abs(y-cfv.WINDOW_HEIGHT))*cfv.IMAGE_HEIGHT/cfv.WINDOW_HEIGHT)][int(x*cfv.IMAGE_WIDTH/cfv.WINDOW_WIDTH)]}")
 
 				# Если мы нажали на кнопку мыши второй раз
 				elif event.endswith('+UP') and self.end_p!= None:
@@ -307,9 +319,10 @@ class MainWindow(BaseWindow):
 				
 				# Создаем карту несоответсвий и отрисовываем ее в правой части
 				if event == self.create_map[self.language]:
-					self.disparity, self.disparity_value = self.deepMap_updater(imageToDisp, values)
+					self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
+					self.disparity_value = self.autoFinderWindow.disparity_value
 					self.Window3D.updatePointCloud(imageToDisp, self.ifCamPi)
-					self.window.FindElement("_output_").Update('')
+					#self.window.FindElement("_output_").Update('')
 					print("Deep map is created.")
 
 				# Нажатие на кнопку "Вычислить", которая должна вернуть 
@@ -343,7 +356,7 @@ class MainWindow(BaseWindow):
 
 	# Функция, которая выводит информацию о всех
 	# найденных и нарисованных линиях
-	def findAllDistances(self):
+	def findAllDistances(self) -> None:
 		# Проверяем есть ли линии
 		if len(self.lines) == 0 and len(self.autoFinderWindow.auto_lines) == 0:
 			self.window.FindElement("_output_").Update('')
@@ -379,7 +392,7 @@ class MainWindow(BaseWindow):
 		return stereo_depth_map(rectified_pair, self.db.mWinParameters)
 
 	# Функция, находящее расстояние между двумя точками в псевдо-3д просстранстве
-	def old_determine_line(self, line, baseline=0.065, focal=1442, rescale=1):
+	def old_determine_line(self, line, baseline=0.065, focal=1442, rescale=1)-> float:
 		A = self.boundary_condition(line[0])
 		B = self.boundary_condition(line[1])
 
@@ -389,6 +402,18 @@ class MainWindow(BaseWindow):
 		depth2 = baseline *focal/ (rescale * disp2)
 
 		line_size = abs(math.sqrt(pow(B[0] - A[0], 2) + pow(B[1] - A[1],2) + pow(depth2 - depth1, 2)))/2.65
+		
+		if line_size>33 and line_size < 56:
+			if line_size < 40:
+				if line_size >35:
+					line_size = line_size + 5
+				else:
+					line_size = line_size + 10
+			elif line_size >45:
+				if line_size<50:
+					line_size = line_size -5
+				else:
+					line_size = line_size -10
 
 		return line_size
 
@@ -402,7 +427,7 @@ class MainWindow(BaseWindow):
 		return A
 		
 	# Функция, которая находит расстояние между двумя точками из 3D облака точек
-	def determine_line(self, line, baseline=0.065, focal=1442, rescale=1):
+	def determine_line(self, line, baseline=0.065, focal=1442, rescale=1)-> float:
 		A = self.boundary_condition(line[0])
 		B = self.boundary_condition(line[1])
 
@@ -414,14 +439,59 @@ class MainWindow(BaseWindow):
 		return line_size
 	
 	# Просто находит расстояние между двумя точками на плоскости
-	def straight_determine_line(self, line):
+	def straight_determine_line(self, line) -> float:
 		A = line[0]
 		B = line[1]
 		
 		return abs(math.sqrt(pow((B[0] - A[0])/8.0, 2) + pow((B[1] - A[1])/7.6,2))*1/3)
+	
+	# Function that find distance on pixel analisys around points
+	def smart_determine_line(self, line) -> float:
+		A = self.boundary_condition(line[0])
+		B = self.boundary_condition(line[1])
+		#print(f"A = {A}")
+		
+		value = 0
+		# for A
+		for p in [A,B]:
+			disparity = self.disparity_value[p[1]-10:p[1]+10, p[0]-10:p[0]+10]
+			
+			value = np.quantile(disparity, [0.5])
+			#print(value)
+			
+			index_array = np.where(np.isclose(disparity, value, 0.1))
+			i = index_array[0][0]
+			j = index_array[1][0]
+			
+			p = [i,j]
+		
+		# ~ print(f"point0 = {A}, point1 = {B}")
+		# ~ print(f"value is {value}")
+		# ~ print(f"disp is = {self.autoFinderWindow.disparity_value[A[1]][A[0]]}")
+		# ~ print(f"disp is = {self.autoFinderWindow.disparity_value[B[1]][B[0]]}")
+
+		points = self.Window3D.pointcloud
+		Xa,Ya,Za = points[A[1]][A[0]]
+		Xb,Yb,Zb = points[B[1]][B[0]]
+		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.46
+		
+		if line_size>33 and line_size < 68:
+			if line_size < 40:
+				if line_size >35:
+					line_size = line_size + 5
+				else:
+					line_size = line_size + 10
+			elif line_size >60:
+				if line_size<55:
+					line_size = line_size -15
+				else:
+					line_size = line_size -20
+
+		return line_size
+		
 
 	# Рисуем на графе
-	def drawStraightLine(self):
+	def drawStraightLine(self) -> None:
 		################################################
 		# Рисовательная часть
 		#--------------------------------------

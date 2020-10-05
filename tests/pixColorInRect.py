@@ -3,25 +3,28 @@ import numpy as np
 
 small_image = cv2.imread("../data/croped_images/croped_box0.jpg")
 
-def get_mode(img):
-	unq,count = np.unique(img.reshape(-1,img.shape[-1]), axis=0, return_counts=True)
-	return unq[count.argmax()]
 
-print(get_mode(small_image))
 
-print(small_image.max(axis=(0,1)))
 
-pixels = []
-print("small_image.shape = ", small_image.shape)
-for px_row in small_image:
-	for px in px_row:
-		print(px)
-		if px in pixels:
-			continue
-		else:
-			pixels.append(px)
+# def get_mode(img):
+# 	unq,count = np.unique(img.reshape(-1,img.shape[-1]), axis=0, return_counts=True)
+# 	return unq[count.argmax()]
 
-print("pixels =",len(pixels))
+# print(get_mode(small_image))
+
+# print(small_image.max(axis=(0,1)))
+
+# pixels = []
+# print("small_image.shape = ", small_image.shape)
+# for px_row in small_image:
+# 	for px in px_row:
+# 		print(px)
+# 		if px in pixels:
+# 			continue
+# 		else:
+# 			pixels.append(px)
+
+# print("pixels =",len(pixels))
 
 
 # from __future__ import print_function

@@ -48,7 +48,7 @@ class PointCloudWindow(BaseWindow):
 		self.Project_3dPic = ('Project 3dPic', 'Построить 3D')
 		self.Show_3DpointCloud = ('Show 3DpointCloud', 'Показать 3D')
 
-	def run(self,image_to_disp, ifCamPi = True):
+	def run(self,image_to_disp, ifCamPi = True) -> None:
 
 		left_column = [
 						[self.sg.Image(filename='', key='Image')],
@@ -142,7 +142,7 @@ class PointCloudWindow(BaseWindow):
 
 		return projected_image_toshow, disparity_to_show, imgLtoShow
 
-	def updatePointCloud(self, image_to_disp, ifCamPi):
+	def updatePointCloud(self, image_to_disp, ifCamPi) -> None:
 
 		pair_img = None
 		if ifCamPi:
@@ -165,7 +165,7 @@ class PointCloudWindow(BaseWindow):
 
 	# Функция для сохранения облака точек 
 	@staticmethod
-	def __write_ply(fn, verts, colors):
+	def __write_ply(fn, verts, colors) -> None:
 		ply_header = '''ply
 		format ascii 1.0
 		element vertex %(vert_num)d
