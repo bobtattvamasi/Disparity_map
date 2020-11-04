@@ -150,9 +150,12 @@ class MainWindow(BaseWindow):
 					)],
 			# Вывод всей важной информации происходит здесь
 			[self.sg.Output(size=(64, 21), key = '_output_')],
+			# Группируем кнопки
 			[self.sg.Frame(self.lineFind3D_Settings[self.language],[
+			# Кнопка для настройки автонахождения линий
 			[self.sg.Button(self.lineFinder_Settings[self.language], size=(15,2)), self.sg.Button(self.D3Cloud_Settings[self.language], size=(15,2))]
 			])],
+			# Кнопка для автонахождения линий на картинке
 			[self.sg.Button(self.auto_lineFinder[self.language], size=(15,2))]
 			
 		]
@@ -237,7 +240,7 @@ class MainWindow(BaseWindow):
 					try:
 						self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
 						self.disparity_value = self.autoFinderWindow.disparity_value
-						self.Window3D.updatePointCloud(imageToDisp, self.ifCamPi)
+						self.Window3D.updatePointCloud(self.disparity,self.disparity_value, self.ifCamPi)
 						self.lineFinder()
 					except:
 						print("find lines dont work")
@@ -246,7 +249,7 @@ class MainWindow(BaseWindow):
 				# Открывает окно настроек 3д облака точек
 				if event == self.D3Cloud_Settings[self.language]:
 					try:
-						self.Window3D.run(imageToDisp, self.ifCamPi)
+						self.Window3D.run(self.disparity,self.disparity_value, self.ifCamPi)
 					except:
 						self.window.FindElement("_output_").Update('')
 						print("ERROR:Firstly create disparity map!")
@@ -321,7 +324,7 @@ class MainWindow(BaseWindow):
 				if event == self.create_map[self.language]:
 					self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
 					self.disparity_value = self.autoFinderWindow.disparity_value
-					self.Window3D.updatePointCloud(imageToDisp, self.ifCamPi)
+					self.Window3D.updatePointCloud(self.disparity,self.disparity_value, self.ifCamPi)
 					#self.window.FindElement("_output_").Update('')
 					print("Deep map is created.")
 
@@ -403,17 +406,17 @@ class MainWindow(BaseWindow):
 
 		line_size = abs(math.sqrt(pow(B[0] - A[0], 2) + pow(B[1] - A[1],2) + pow(depth2 - depth1, 2)))/2.65
 		
-		if line_size>33 and line_size < 56:
-			if line_size < 40:
-				if line_size >35:
-					line_size = line_size + 5
-				else:
-					line_size = line_size + 10
-			elif line_size >45:
-				if line_size<50:
-					line_size = line_size -5
-				else:
-					line_size = line_size -10
+		# if line_size>33 and line_size < 56:
+		# 	if line_size < 40:
+		# 		if line_size >35:
+		# 			line_size = line_size + 5
+		# 		else:
+		# 			line_size = line_size + 10
+		# 	elif line_size >45:
+		# 		if line_size<50:
+		# 			line_size = line_size -5
+		# 		else:
+		# 			line_size = line_size -10
 
 		return line_size
 
@@ -434,7 +437,9 @@ class MainWindow(BaseWindow):
 		points = self.Window3D.pointcloud
 		Xa,Ya,Za = points[A[1]][A[0]]
 		Xb,Yb,Zb = points[B[1]][B[0]]
-		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.46
+
+		# print(f"point1 = ({Xa}, {Ya},{Za}) ; point2 = ({Xb}, {Yb},{Zb})")
+		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.46-8
 
 		return line_size
 	
@@ -475,17 +480,17 @@ class MainWindow(BaseWindow):
 		Xb,Yb,Zb = points[B[1]][B[0]]
 		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.46
 		
-		if line_size>33 and line_size < 68:
-			if line_size < 40:
-				if line_size >35:
-					line_size = line_size + 5
-				else:
-					line_size = line_size + 10
-			elif line_size >60:
-				if line_size<55:
-					line_size = line_size -15
-				else:
-					line_size = line_size -20
+		# if line_size>33 and line_size < 68:
+		# 	if line_size < 40:
+		# 		if line_size >35:
+		# 			line_size = line_size + 5
+		# 		else:
+		# 			line_size = line_size + 10
+		# 	elif line_size >60:
+		# 		if line_size<55:
+		# 			line_size = line_size -15
+		# 		else:
+		# 			line_size = line_size -20
 
 		return line_size
 		

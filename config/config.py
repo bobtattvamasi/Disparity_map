@@ -11,7 +11,8 @@ class configValues(NamedTuple):
 	#folderTestScenes = './data/objects_high/*.png'
 	#folderTestScenes = './data/objects_low/*.png'
 	#folderTestScenes = './data/photo_data/*.png'
-	folderTestScenes = './data/test_disparity/*.png'
-	folderTestScenes = './data/NOT_HIGH/*.png'
+	#folderTestScenes = './data/test_disparity/*.png'
+	#folderTestScenes = './data/NOT_HIGH/*.png'
+	folderTestScenes = './data/boxes/*.png'
 
 	

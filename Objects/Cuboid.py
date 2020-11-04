@@ -27,34 +27,127 @@ class Cuboid(BaseObject):
 		return warped
 
 	# Выкидываем
-	# def _return_box_picture(self, img):
-	# 	width = int(self.rect[1][0])
-	# 	height = int(self.rect[1][1])
+	def _return_box_picture(self, img):
+		width = int(self.rect[1][0])
+		height = int(self.rect[1][1])
 
-	# 	src_pts = self.box.astype("float32")
+		src_pts = self.box.astype("float32")
 
-	# 	dst_pts = np.array([[0, height-1],
-	# 						[0, 0],
-	# 						[width-1, 0],
-	# 						[width-1, height-1]], dtype="float32")
-	# 	M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-	# 	inv_M = cv2.getPerspectiveTransform(dst_pts, src_pts)
+		dst_pts = np.array([[0, height-1],
+							[0, 0],
+							[width-1, 0],
+							[width-1, height-1]], dtype="float32")
+		M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+		inv_M = cv2.getPerspectiveTransform(dst_pts, src_pts)
 
-	# 	pts = np.int0(cv2.transform(np.array([self.box]), M))[0]    
-	# 	pts[pts < 0] = 0
+		pts = np.int0(cv2.transform(np.array([self.box]), M))[0]    
+		pts[pts < 0] = 0
 
-	# 	rows,cols = img.shape[0], img.shape[1]
-	# 	img_rot = cv2.warpPerspective(img, M, (cols,rows))
-	# 	disp_crop = img_rot[pts[1][1]:pts[0][1], 
-	# 					   pts[1][0]:pts[2][0]]
-	# 	cv2.imwrite(f"data/croped_images/returned_box_picture{self.number+1}.jpg", disp_crop)
-	# 	return disp_crop
+		rows,cols = img.shape[0], img.shape[1]
+		img_rot = cv2.warpPerspective(img, M, (cols,rows))
+		disp_crop = img_rot[pts[1][1]:pts[0][1], 
+						   pts[1][0]:pts[2][0]]
+		cv2.imwrite(f"data/croped_images/returned_box_picture{self.number+1}.jpg", disp_crop)
+		return disp_crop
 
-	# Функция где мы будем издеваться над найденными боксами
-	def test_box_game(self):
-		print(f"average_disparity_value: {self.average_disparity_value}")
-		print(f"max_disparity_value: {self.max_disparity_value}")
-		print(f"min_disparity_value : {self.min_disparity_value}")
+	def test_with_vertexbox(self, params):
+		if self.main_vertex is not None:
+
+			# Устанавливается диапазон значений для цветового фильтра 
+			hsv_min = np.array((params["lowH"], params["lowS"], params["lowV"]), np.uint8)
+			hsv_max = np.array((params["highH"], params["highS"], params["highV"]), np.uint8)
+
+			gray = cv2.cvtColor(self.Mat_image, cv2.COLOR_BGR2GRAY)
+
+			hsv_frame = cv2.cvtColor(self.Mat_image, cv2.COLOR_BGR2HSV)
+			mask_frame = cv2.inRange(hsv_frame, hsv_min, hsv_max)
+
+			blurred = cv2.GaussianBlur(mask_frame, (5, 5), 0)
+
+			thresh = cv2.threshold(blurred, params["Thmin"], 
+					params["Thmax"], cv2.THRESH_BINARY)[1]
+			
+			image_blur = cv2.medianBlur(thresh, 25)
+			_, thresh = cv2.threshold(image_blur, 240,255, cv2.THRESH_BINARY_INV)
+
+			cv2.imwrite(f'data/work_on_contour_redraw/cube_mask_{self.number}.jpg', thresh)
+
+	# Функция где мы находим линию ребра
+	def find_edge_points(self, image):
+		if self.main_vertex is None:
+			print(f"average_disparity_value: {self.average_disparity_value}")
+			print(f"max_disparity_value: {self.max_disparity_value}")
+			print(f"min_disparity_value : {self.min_disparity_value}")
+
+			# Найти на картинке бокса особенные точки
+			height, width = self.Mat_image.shape[:2]
+			black_image = np.zeros((height,width, 3), np.uint8)
+			black_image[:] = (255,0,0)
+			# Нарисовать эти точки на черном изображении того же размера
+
+			# Работать с этими точками...
+			listOfCoordinates = self.get_disparity_values_by_last_quart()
+
+			for index in listOfCoordinates:
+				self.draw_point(black_image, index, color=(255,255,255))
+
+			gray = cv2.cvtColor(black_image, cv2.COLOR_BGR2GRAY)
+			blur = cv2.GaussianBlur(gray, (3,3), 0)
+
+			thresh = cv2.threshold(blur, 240,255, cv2.THRESH_BINARY)[1]
+
+			cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+			c = max(cnts, key=cv2.contourArea)
+
+			# Obtain outer coordinates
+			left = tuple(c[c[:, :, 0].argmin()][0])
+			right = tuple(c[c[:, :, 0].argmax()][0])
+			top = tuple(c[c[:, :, 1].argmin()][0])
+			bottom = tuple(c[c[:, :, 1].argmax()][0])
+
+			cv2.rectangle(black_image, (left[0], top[1]), (right[0], bottom[1]), (255, 255, 255), 2)
+
+			small_width = right[0] - left[0]
+			small_height = bottom[1] - right[1]
+
+			print(f'width  = {width}; height  = {height}')
+			print(f'small_w= {small_width}; small_h={small_height}')
+
+			center_x = left[0] + small_width//2
+			center_y = right[0] + small_height//2
+
+			eps = 30
+
+			p1,p2 = None,None
+			
+			if (width - small_width) <= eps:
+				print ('first')
+				self.draw_line(black_image, (0,center_y), (width, center_y), color=(255,255,255))
+
+				p1,p2 = (0,center_y), (width, center_y)
+			
+			elif (height - small_height) <= eps:
+				print ('second')
+				self.draw_line(black_image, (center_x,0), (center_x, height), color=(255,255,255))
+
+				p1,p2 = (center_x,0), (center_x, height)
+
+			#cv2.imwrite(f'data/work_on_aprox_line/cube_mask_{self.number}.jpg', black_image)
+			#cv2.imwrite(f'data/work_on_aprox_line/cube_{self.number}.jpg', self.Mat_image)
+
+			self.edge_points = [p1,p2]
+
+			print(f"p1,p2 = {p1}, {p2}")
+
+			#if not is_line_out_of_box(p1,p2, box):
+			if (p1 != None) and (p2 != None):
+				p1 = self.rotate_xy_from_rect_coord_system(p1)
+				p2 = self.rotate_xy_from_rect_coord_system(p2)
+
+				self.draw_line(image, p1, p2)
+		
+
 
 	def __init__(self, image, disparity_values, rect, number):
 		# rotated rect
@@ -71,6 +164,8 @@ class Cuboid(BaseObject):
 		self.Mat_disparity_crop = self._crop_object(disparity_values)
 		self.Mat_image = self._crop_object(image)
 		self.Mat_picture = self._crop_object(image)
+
+		
 		
 		#Все найденные вершины будут храниться здесь
 		self.vertexes = None
@@ -104,90 +199,56 @@ class Cuboid(BaseObject):
 		indexes = np.where(self.Mat_disparity_crop >= quart[-1])
 		listOfIndexes = list(zip(indexes[1], indexes[0]))
 		return listOfIndexes
-	
-	# Находит максимальный по значению пиксел с картинки(Уже нет. Пока что здесь происходит основное действие поля боя моего мозга с датой с каждой найденной мной коробки)
-	def find_edges_and_vertexes(self,disp,image):
-		width, height = self.Mat_disparity_crop.shape
 
+	def create_lines(self):
+		if self.edge_points == [None,None]:
+			for j in range(len(self.box)):
+				last = j+1
+				if last ==4:
+					last = 0
+				self.lines.append([self.box[j],self.box[last]])
+		else:
+			# for j in range(len(box)):
+			# 	last = j+1
+			# 	if last ==4:
+			# 		last = 0
+			# 	self.lines.append([box[j],box[last]])
+
+			edge_p0 = self.rotate_xy_from_rect_coord_system(self.edge_points[0])
+			edge_p1 = self.rotate_xy_from_rect_coord_system(self.edge_points[1])
+
+			self.lines.append([self.box[0], self.box[1]])
+			self.lines.append([self.box[1], edge_p0])
+			self.lines.append([edge_p0, self.box[2]])
+			self.lines.append([self.box[2], self.box[3]])
+			self.lines.append([self.box[3], edge_p1])
+			self.lines.append([edge_p1, self.box[0]])
+			self.lines.append([edge_p0, edge_p1])
+
+	def draw_all_lines(self,image):
+		print(f"LINES : {self.lines}")
+		for i in range(len(self.lines)):
+			self.draw_line(image, self.lines[i][0],self.lines[i][1])
+
+			# cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			# 	fontScale=1, color=(255,255,255), thickness = 3)
+
+			# print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([box[k],box[last]]), 2)} mm")
+
+	# Находит максимальные точки внутри кубоида
+	def find_extremum_points(self):
 		# Применяем medianBlur-фильтр, сглаживая все пиксели внутри
 		self.Mat_disparity_crop = ImageProccessHelper.filtering_box(self.Mat_disparity_crop, isBox=False)
 
 		# Возвращает индексы пикселей с наивысшими значениями, которые входят 8 процентов пикселей
 		# и создаем из этого массив индексов
 		listOfCoordinates = self.get_disparity_values_by_last_quart()
-		inde = []
-		for ind in listOfCoordinates:
-			inde.append([ind[0],ind[1]])
-		inde = np.array(inde)
 
-		# Находим коэффициенты для построения апроксимирующей линии
-		m,b = self._best_fit(inde)
 
-		# Возвращаются точки конца и начала апраксимирующей линии
-		# из идеи, что линии строится по координатам начала и конца прямоугольника по оси x  
-		self.edge_points = self._create_line_points_by_mb(m, b, 0, int(width))
-
-		# Проверяется, есть ли начало и конец открезка линии внутри прямоугольника.
-		box = (-2, -2, width+2, height+2)
-		if not self._rectContains(box, self.edge_points[0]):
-			self.edge_points[0] = None
-		if not self._rectContains(box, self.edge_points[1]):
-			self.edge_points[1] = None
-		
-		if self.edge_points[0] != None and self.edge_points[1] != None:
-
-			is_not_p1 = False
-			# Проверяем, лежит ли точка p1 внутри box'a 
-			try:
-				self.Mat_disparity_crop[self.edge_point[0][0]][self.edge_points[0][1]]
-			except:
-				#print("is not p1")
-				is_not_p1 = True
-			# Проверяем, лежит ли точка p2 внутри box'a 
-			try:
-				self.Mat_disparity_crop[edge_point[1][0]][self.edge_points[1][1]]
-			except:
-				#print("is not p2")
-				is_not_p1 = False
-			
-			# Если не p1, то мы меняем местами p1 и p2
-			if is_not_p1:
-				self.edge_points[0], self.edge_points[1] = self.edge_points[1], self.edge_points[0]
-
-			# Создаем массив значений диспарити карты по всем точкам линии
-			self.disparity_line_points = []
-			line_point = self._get_all_points_of_line(self.edge_points[0],self.edge_points[1])
-			line_point = np.array(line_point)
-
-			# Заменяем вторую точку линии, на последнюю точку в том направлении,
-			# которая лежит внутри box'a
-			i,j = 0,0
-			try:
-				for i in range(0, int(rect[1][0])):
-					for j in range(0, int(rect[1][1])):
-						if i in line_point[:,0] and j in line_point[:,1]:
-							self.disparity_line_points.append(self.Mat_disparity[i][j])
-			except:
-				self.edge_points[1] = (i,j)
-
-		
-		# Проверка - действительно ли наша вершина - вершина 
-		flag_ = self.is_main_vertex(disp)
-		if disp[int(self.main_vertex[1])][int(self.main_vertex[0])] > 268 and flag_:
-			self.draw_text_point(image,self.main_vertex, 'vertex',textcolor=(0,0,255))
-			#print(f"self.main_vertex : {disp[int(self.main_vertex[1])][int(self.main_vertex[0])]}")
-		else:
-			self.main_vertex = None
-		
-		# try:
-		# 	self.disparity_line_points = np.array(self.disparity_line_points)
-		# 	#print(f"Avg of line_points = {np.average(disparity_line_point)}")
-		# 	#print(f"Max of line_points = {np.argmax(disparity_line_point)}")
-		# 	#print(f"Min of line_points = {np.argmin(disparity_line_point)}")
-		# except:
-		# 	#print("problem with disparity line points")
-		# 	pass
-		
+		# Создаем массив значений диспарити карты по всем точкам линии
+		# self.disparity_line_points = []
+		# line_point = self._get_all_points_of_line(self.edge_points[0],self.edge_points[1])
+		# self.disparity_line_points = np.array(line_point)		
 
 		return listOfCoordinates
 
@@ -208,7 +269,7 @@ class Cuboid(BaseObject):
 			for j in range(self.height-1):
 				point = self.rotate_xy_from_rect_coord_system([i,j])
 				point = self.boundary_condition(point)
-				#self.draw_circle(image, point)
+				self.draw_circle(image, point)
 				#print(f"point = {point}")
 				# if int(point[0]) == 720:
 				# 	point[0] = 719
@@ -216,59 +277,78 @@ class Cuboid(BaseObject):
 
 		#print(f"line1={_self.determine_line([self.Mat_disparity_crop()])}")
 
-	# Нахожу лишь одну вершину
-	def find_only_one_vertex(self, image):
-
+	# Нахожу лишь одну вершину в кубоиде
+	def find_only_one_vertex(self, image, disp):
+		# создаю массив средних значений внутри границ найденного кубоида
 		b = np.array([[np.mean(self.Mat_disparity_crop[y-10:y+10, x-10:x+10]) for y in range(10, int(self.height)-10)] for x in range(10, int(self.width)-10)])
+		# Находим координаты x и y максимальной точки из найденного массива
 		maxcenterx = np.unravel_index(b.argmax(), b.shape)[0]+10
 		maxcentery = np.unravel_index(b.argmax(), b.shape)[1]+10
 
-		point = [maxcenterx,maxcentery]#ij_coord[ind_z_min]
+		point = [maxcenterx,maxcentery]
+		# Масштабируем координаты на все изображение
 		point = self.rotate_xy_from_rect_coord_system(point)
 		
+		# Присваиваем в main_vertex
 		self.main_vertex = point
+
+		# Проверка - действительно ли наша вершина - вершина 
+		flag_ = self.is_main_vertex(disp)
+		if disp[int(self.main_vertex[1])][int(self.main_vertex[0])] > 268 and flag_:
+			# Рисуем эту вершину и подписываем 'Vertex'
+			self.draw_text_point(image,self.main_vertex, 'vertex',textcolor=(0,0,255))
+		else:
+			self.main_vertex = None
 
 	# Находятся экстремумы, вершины, ребра.
 	def find_vertex(self, image, disp):
+		pass
 
 		# Находим индексы экстремальных точек
-		# Внутри функции находятся также main_vertex и edge_po ints
-		indexes = self.find_edges_and_vertexes(disp,image)
-		p1,p2 = self.edge_points
+		# indexes = self.find_extremum_points()
+
+		# Если вершины нет, то находим внутренее ребро и отрисовываем его
+		# if self.main_vertex == None:
+		# 	self.find_edge_points()
+		# 	p1,p2 = self.edge_points
+		# 	print(f"p1,p2 = {p1}, {p2}")
+
+		# 	#if not is_line_out_of_box(p1,p2, box):
+		# 	if (p1 != None) and (p2 != None):
+		# 		p1 = self.rotate_xy_from_rect_coord_system(p1)
+		# 		p2 = self.rotate_xy_from_rect_coord_system(p2)
+
+		# 		self.draw_line(image, p1, p2)
 		
 		#disp = self.rebuld_disparity_map_by_rect(disp)
 
-		disp_values_in_extremum = []
-		for index in indexes:
-			index = self.rotate_xy_from_rect_coord_system(index)
+		# disp_values_in_extremum = []
+		# for index in indexes:
+		# 	index = self.rotate_xy_from_rect_coord_system(index)
 
-			# Рисуются точки экстремума на карте
-			#self.draw_circle(image, index)
-			disp_values_in_extremum.append(disp[int(index[1]),int(index[0])])
+		# 	# Рисуются точки экстремума на карте
+		# 	#self.draw_circle(image, index)
+		# 	disp_values_in_extremum.append(disp[int(index[1]),int(index[0])])
 		
-		self.isp1p2 = False
-		list_of_lines = []
+		#self.isp1p2 = False
+		#list_of_lines = []
 		
-		#if not is_line_out_of_box(p1,p2, box):
-		if (p1 != None) and (p2 != None):
-			p1 = self.rotate_xy_from_rect_coord_system(p1)
-			p2 = self.rotate_xy_from_rect_coord_system(p2)
-			self.draw_line(image, p1, p2)
+		
 		
 			#list_of_lines = self.combine_line_in_box(image, p1, p2)
 			#self.isp1p2 = True
 
 			# Переделать
-			self.isp1p2 = False
+			#self.isp1p2 = False
 
 		#newpts = self.rotate_xy_from_rect_coord_system(vertex_point)
 		
-		width = int(self.rect[1][0])
-		height = int(self.rect[1][1])
-		flag = True
+		# width = int(self.rect[1][0])
+		# height = int(self.rect[1][1])
+		# flag = True
 
 		#draw_test_rectangle(image, rect, box)
-		coef = 0.1
+		#coef = 0.1
 		# ~ for i in range(0, int(width)):
 			# ~ for j in range(0, int(height)):
 				# ~ # if (newpts[0]<(coef*width+box[1][0]) and newpts[1]<(coef*height + box[1][1])) or\
@@ -365,8 +445,6 @@ class Cuboid(BaseObject):
 
 		# Берем область вершины с радиусом winsize
 		disp_crop = disp[int(self.main_vertex[1]-winsize//2):int(self.main_vertex[1]+winsize//2),int(self.main_vertex[0]-winsize//2):int(self.main_vertex[0]+winsize//2)]
-		# ~ print(f"mean = {np.quantile(disp_crop,[0.5])}")
-		# ~ print(f"max  = {disp_crop.max()}")
 
 		# Находим среднее 
 		mean = np.quantile(disp_crop,[0.5])[0]
@@ -443,8 +521,8 @@ class Cuboid(BaseObject):
 
 	# Рисует точку
 	@staticmethod
-	def draw_point(img, point):
-		cv2.circle(img, (int(point[0]), int(point[1])), 1, (0,0,255), 1)
+	def draw_point(img, point, color=(0,0,255)):
+		cv2.circle(img, (int(point[0]), int(point[1])), 1, color, 1)
 
 	# Рисует маленькую окружность
 	@staticmethod
@@ -454,8 +532,8 @@ class Cuboid(BaseObject):
 
 	# Рисуется прямая по двум точкам
 	@staticmethod
-	def draw_line(image, p1, p2):	
-		cv2.line(image, (int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])), (0,255,0), 5)
+	def draw_line(image, p1, p2, color=(0,255,0)):	
+		cv2.line(image, (int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])), color, 5)
 		# cv2.putText(image,'P1',(int(p1[0]),int(p1[1]+3)),fontFace=cv2.FONT_HERSHEY_SIMPLEX,fontScale=1, color=(255,255,255), thickness = 3)
 		# cv2.putText(image,'P2',(int(p2[0]),int(p2[1]+3)),fontFace=cv2.FONT_HERSHEY_SIMPLEX,fontScale=1, color=(255,255,255), thickness = 3)
 	

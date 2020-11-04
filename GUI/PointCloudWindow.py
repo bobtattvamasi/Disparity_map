@@ -48,7 +48,7 @@ class PointCloudWindow(BaseWindow):
 		self.Project_3dPic = ('Project 3dPic', 'Построить 3D')
 		self.Show_3DpointCloud = ('Show 3DpointCloud', 'Показать 3D')
 
-	def run(self,image_to_disp, ifCamPi = True) -> None:
+	def run(self,disparity, native_disparity, ifCamPi = True) -> None:
 
 		left_column = [
 						[self.sg.Image(filename='', key='Image')],
@@ -87,7 +87,7 @@ class PointCloudWindow(BaseWindow):
 
 
 			if event == self.Project_3dPic[self.language]:
-				projected_image_toshow, disparity_to_show, imgLtoShow = self.createCloudPointsInPLY(image_to_disp, ifCamPi)
+				projected_image_toshow, disparity_to_show = self.createCloudPointsInPLY(disparity, native_disparity, ifCamPi)
 
 			if event == self.Show_3DpointCloud[self.language]:
 				os.system("meshlab output.ply")
@@ -100,32 +100,34 @@ class PointCloudWindow(BaseWindow):
 		window.close()
 
 	# Создает облако точек для отображения и сохраняет его
-	def createCloudPointsInPLY(self, image_to_disp, ifCamPi):
+	def createCloudPointsInPLY(self, disparity, native_disparity, ifCamPi):
 		map_width = cfv.IMAGE_WIDTH
 		map_height = cfv.IMAGE_HEIGHT
 
 		r = np.eye(3)
 		t = np.array([0, 0.0, 100.5])
 
-		pair_img = None
-		if ifCamPi:
-			pair_img = cv2.cvtColor(image_to_disp, cv2.COLOR_BGR2GRAY)
-		else:
-			pair_img = cv2.imread(image_to_disp,0)
+		self.disparity = disparity
+
+		# pair_img = None
+		# if ifCamPi:
+		# 	pair_img = cv2.cvtColor(image_to_disp, cv2.COLOR_BGR2GRAY)
+		# else:
+		# 	pair_img = cv2.imread(image_to_disp,0)
 		
-		# Cutting stereopair to the left and right images
-		imgLeft = pair_img [0:self.img_height,0:int(self.img_width/2)] #Y+H and X+W
-		imgRight = pair_img [0:self.img_height,int(self.img_width/2):self.img_width] #Y+H and X+W
+		# # Cutting stereopair to the left and right images
+		# imgLeft = pair_img [0:self.img_height,0:int(self.img_width/2)] #Y+H and X+W
+		# imgRight = pair_img [0:self.img_height,int(self.img_width/2):self.img_width] #Y+H and X+W
 		
-		# Undistorting images
-		imgL = cv2.remap(imgLeft, self.leftMapX, self.leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-		imgR = cv2.remap(imgRight, self.rightMapX, self.rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-		rectified_pair = (imgL, imgR)
-		imgLtoShow = cv2.resize (imgL, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
-		imgRtoShow = cv2.resize (imgR, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
+		# # Undistorting images
+		# imgL = cv2.remap(imgLeft, self.leftMapX, self.leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+		# imgR = cv2.remap(imgRight, self.rightMapX, self.rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+		# rectified_pair = (imgL, imgR)
+		# imgLtoShow = cv2.resize (imgL, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
+		# imgRtoShow = cv2.resize (imgR, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
 			
 		# Disparity map calculation
-		self.disparity,  native_disparity  = stereo_depth_map(rectified_pair, self.db.mWinParameters)
+		#self.disparity,  native_disparity  = stereo_depth_map(rectified_pair, self.db.mWinParameters)
 		disparity_to_show = cv2.resize (self.disparity, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
 
 		# Point cloud calculation   
@@ -140,26 +142,26 @@ class PointCloudWindow(BaseWindow):
 		projected_image = calc_projected_image(points_3, colors, r, t, self.right_K, dist_coeff, map_width, map_height)
 		projected_image_toshow = cv2.resize (projected_image, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
 
-		return projected_image_toshow, disparity_to_show, imgLtoShow
+		return projected_image_toshow, disparity_to_show
 
-	def updatePointCloud(self, image_to_disp, ifCamPi) -> None:
+	def updatePointCloud(self, disparity, native_disparity, ifCamPi) -> None:
 
-		pair_img = None
-		if ifCamPi:
-			pair_img = cv2.cvtColor(image_to_disp, cv2.COLOR_BGR2GRAY)
-		else:
-			pair_img = cv2.imread(image_to_disp,0)
+		# pair_img = None
+		# if ifCamPi:
+		# 	pair_img = cv2.cvtColor(image_to_disp, cv2.COLOR_BGR2GRAY)
+		# else:
+		# 	pair_img = cv2.imread(image_to_disp,0)
 
-		# Cutting stereopair to the left and right images
-		imgLeft = pair_img [0:self.img_height,0:int(self.img_width/2)] #Y+H and X+W
-		imgRight = pair_img [0:self.img_height,int(self.img_width/2):self.img_width] #Y+H and X+W
+		# # Cutting stereopair to the left and right images
+		# imgLeft = pair_img [0:self.img_height,0:int(self.img_width/2)] #Y+H and X+W
+		# imgRight = pair_img [0:self.img_height,int(self.img_width/2):self.img_width] #Y+H and X+W
 		
-		# Undistorting images
-		imgL = cv2.remap(imgLeft, self.leftMapX, self.leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-		imgR = cv2.remap(imgRight, self.rightMapX, self.rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-		rectified_pair = (imgL, imgR)
+		# # Undistorting images
+		# imgL = cv2.remap(imgLeft, self.leftMapX, self.leftMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+		# imgR = cv2.remap(imgRight, self.rightMapX, self.rightMapY, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+		# rectified_pair = (imgL, imgR)
 
-		_,  native_disparity  = stereo_depth_map(rectified_pair, self.db.mWinParameters)
+		# _,  native_disparity  = stereo_depth_map(rectified_pair, self.db.mWinParameters)
 
 		self.pointcloud = cv2.reprojectImageTo3D(native_disparity, self.QQ)
 

@@ -1,8 +1,8 @@
-SpklWinSze,1
-SpcklRng,0
-UnicRatio,15
-TxtrThrshld,327
-NumOfDisp,96
+SpklWinSze,141
+SpcklRng,40
+UnicRatio,8
+TxtrThrshld,29
+NumOfDisp,80
 MinDISP,219
 PreFiltCap,63
 PFS,5

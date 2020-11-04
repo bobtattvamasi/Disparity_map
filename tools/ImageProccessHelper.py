@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import imutils
 import math
+import os
 
 from config.config import configValues
 from Objects.Cuboid import Cuboid
@@ -87,14 +88,16 @@ def stereo_depth_map(rectified_pair, parameters, filtering=False):
 	sbm.setTextureThreshold(parameters['TxtrThrshld'])
 	sbm.setUniquenessRatio(parameters['UnicRatio'])
 	sbm.setSpeckleRange(parameters['SpcklRng'])
-	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])
-	
+	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])	
 	
 	
 	disparity = sbm.compute(dmLeft, dmRight)
 	old_disparity = disparity
-	disparity = a_tricky_filter_old(old_disparity)
 
+	# Пред-фильтрация
+	#disparity = a_tricky_filter_old(old_disparity)
+
+	# Жесткая фильтрация. Скорее всего от нее откажемся.
 	if filtering:
 		wls_filter = cv2.ximgproc.createDisparityWLSFilter(sbm)
 		right_matcher = cv2.ximgproc.createRightMatcher(sbm)
@@ -107,18 +110,13 @@ def stereo_depth_map(rectified_pair, parameters, filtering=False):
 
 		disparity = wls_filter.filter(disparity, dmLeft, disparity_map_right=right_disp )
 		#disparity_value = filtering_box(disparity_value)
-		
-
-	#print(f"LRCthresh = {wls_filter.getLRCthresh()}")
-	
-	#disparity = wls_filter.getConfidenceMap()
 
 	
 
 	local_max = disparity.max()
 	local_min = disparity.min()
 
-	print(f"local max = {local_max}, local_min = {local_min}")
+	#print(f"local max = {local_max}, local_min = {local_min}")
 
 	global autotune_max, autotune_min
 	# autotune_max = max(autotune_max, disparity.max())
@@ -132,9 +130,14 @@ def stereo_depth_map(rectified_pair, parameters, filtering=False):
 
 	disparity_value = disparity.astype(np.float32) / 16.0
 
-	disparity_value = a_tricky_filter(disparity_value)
+	# Здесь происходит фильтрация карты
+	#disparity_value = a_tricky_filter(disparity_value)
+	#disparity_value = filtering_box(disparity_value)
 
-	disparity_value = filtering_box(disparity_value)
+	# Находим количество файлов в папке и сохраняем нашу карту глубин
+	path = 'data/good_depth_maps'
+	num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
+	cv2.imwrite(path + f'/map_{num_files+1}.jpg', disparity_color)
 
 
 	return disparity_color, disparity_value #disparity.astype(np.float32) / 16.0
@@ -142,11 +145,8 @@ def stereo_depth_map(rectified_pair, parameters, filtering=False):
 # def do_in_slide_window(roi)
 # 	value = np.quantile(roi, [0.92])
 
+# Пост-фильтрация
 def a_tricky_filter(disparity_values):
-	# print(f"disparity_max : {np.argmax(disparity_values[159:])}")
-	# print(f"disparity : {disparity_values[159][10]}")
-
-	# print(f"shape = {disparity_values.shape}")
 
 	disparity_values[:,:320][disparity_values[:,:320]>218]=218
 	disparity_values[:,320:][(disparity_values[:,320:]>290)]=260
@@ -154,75 +154,33 @@ def a_tricky_filter(disparity_values):
 
 	return disparity_values
 
+# Убираем слишком явные невозможные мимнимумы и максимумы по всех карте глубин
 def a_tricky_filter_old(disparity_values):
-	# print(f"disparity_max : {np.argmax(disparity_values[159:])}")
-	# print(f"disparity : {disparity_values[159][10]}")
 
-	# print(f"shape = {disparity_values.shape}")
-
-	disparity_values[:,:320][disparity_values[:,:320]>3488]=3488
-	disparity_values[:,320:][(disparity_values[:,320:]>5000)]=4164
+	#disparity_values[:,:320][disparity_values[:,:320]>3488]=3488
+	#disparity_values[:,320:][(disparity_values[:,320:]>5000)]=4164
 	disparity_values[:,320:][(disparity_values[:,320:]<4161)]=4161
 
 	return disparity_values
 
-
+# Фильтрация внутри бокса
 def filtering_box(disparity_values, winsize=10, step=1, isBox=False):
 	#img = disparity_values
 	value = 0
 	img_shape = disparity_values.shape
 	if isBox:
 		value = 260
-		#value = np.quantile(disparity_values, [0.92])
 		values = disparity_values.tolist()
 		values = np.array(values)
 		values=values[(values>(value+2))]
-		# ~ print(f"values = {values}")
-		# ~ print(f"np.mean(values) = {np.mean(values)}")
 		for i in range(img_shape[0]):
 			for j in range(img_shape[1]):
 				if np.isclose(disparity_values[i][j], value, 1):
 					disparity_values[i][j] = np.mean(values)
 
-	
-	#print(f"width = {width}, height = {height}")
-	# for i in range(0, int(img_shape[0]-winsize),step):
-	# 	ii = i + winsize//2
-	# 	for j in range(0, int(img_shape[1]-winsize),step):
-	# 		jj = j+winsize//2
-			
-	# 		if not isBox:
-	# 			value = np.quantile(disparity_values[ii-(winsize//2-1):ii+(winsize//2-1), jj-(winsize//2-1):jj+(winsize//2-1)], [0.92])
-	# 		#print(f"i = {i}, j = {j}")
-	# 		#print(f"value = {value}")
-	# 		if abs(disparity_values[i][j] - value)>100:
-	# 			disparity_values[i][j] = value
-
-	#kernel = np.ones((5,5),np.float32)
-	#disparity_values = cv2.filter2D(disparity_values,14,kernel)
 	disparity_values = cv2.medianBlur(disparity_values,5)
 
-
-	# img = disparity_values
-	# img_shape = img.shape
-	# size = 20
-	# shape = (img.shape[0] - size + 1, img.shape[1] - size + 1, size, size)
-	# strides = 2 * img.strides
-	# patches = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
-	# patches = patches.reshape(-1, size, size)
-
-	# output_img = np.array([do_in_slide_window(roi) for roi in patches])
-	# output_img.reshape(img_size)
-
-
-
-
-
 	return disparity_values
-
-		
-	
-			
 
 
 # Вырезает найденный прямоугольный 
@@ -367,12 +325,9 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		rect = cv2.minAreaRect(c)
 
 
-		#crop_image = crop_minAreaRect(copy_image, rect, j=j)
-
 		disp = self_.disparity_value
 		#if j == 1:
 		
-		#cv2.imwrite("point_disp.jpg", copy_image)
 		
 		# Заполняем массив кубоидами по прямоугольникам
 		cubes.append(Cuboid(image, disp, rect,j))
@@ -380,48 +335,55 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		#------ Здесь происходит поиск ключевых объектов внутри найденных предметов
 
 		# Нахожу лишь одну вершину
-		cubes[j].find_only_one_vertex(image)
+		cubes[j].find_only_one_vertex(image, disp)
+		cubes[j].find_edge_points(image)
+		cubes[j].create_lines()
+		cubes[j].draw_all_lines(image)
 
-		self_.disparity_value = cubes[j].find_vertex(image, disp)
+		#self_.disparity_value = cubes[j].find_vertex(image, disp)
 
-		cubes[j].fill_crop_test(image, self_.disparity_value)
+
+		# Играемся с перерисовыванием контуров внутри бокса
+		# cubes[j].test_with_vertexbox(self_.db.aDRWinParameters)
+
+		# cubes[j].fill_crop_test(image, self_.disparity_value)
 		#------ 
 
 		box = np.int0(cv2.boxPoints(rect))
+		print(f'box = {box}')
 		#-------------------------
 		if ifPrintRect:
 			print(f"object {j+1}:")
-		# for printing all lines of object
+		# Для того, что бы отобразить размеры всех линий
+
+		# Линии отображаются с учетом найденного ребра
 		if not cubes[j].isp1p2:
-			for k in range(4):
-				last = k+1
-				if last ==4:
-					last = 0			
-				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			for k in range(len(cubes[j].lines)):
+				# last = k+1
+				# if last ==4:
+				# 	last = 0			
+				# cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+				# fontScale=1, color=(255,255,255), thickness = 3)
+
+				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2), int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2 ) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 				fontScale=1, color=(255,255,255), thickness = 3)
 				
 				if ifPrintRect:
 					#print(f"box type = {type(box[k])}")
-					self_.autoFinderWindow.auto_lines.append([box[k],box[last]])
-					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.old_determine_line([box[k],box[last]]), 2)} mm")
+					#self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
+					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line( [ [int(cubes[j].lines[k][0][0]),int(cubes[j].lines[k][0][1])], [int(cubes[j].lines[k][1][0]),int(cubes[j].lines[k][1][1])] ] ), 2)} mm")
+		# Линии отображаются только по 4м сторонам
 		else:
 			for k in range(len(cubes[j].lines)):
 				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
 				fontScale=1, color=(255,255,255), thickness = 3)
 				
 				if ifPrintRect:
-					#print(f"list_of_lines[k][0]= {list_of_lines[k][0]}")
-					#print(f"list_of_lines[k][1] = {list_of_lines[k][1]}")
-					cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
-					cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
-					#print(f"list_of_lines type = {type(list_of_lines[k][0])}")
-					
-					# ~ if k == len(list_of_lines)-1:
-							# ~ disparity_line_point			
+					#cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
+					#cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
 					
 					self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
-					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.smart_determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
-					#self_.smart_determine_line([np.array(list_of_lines[k][0]),np.array(list_of_lines[k][1])])
+					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
 		
 
 		if not ifPrintRect:
@@ -431,14 +393,9 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 			self_.auto_lines.append([box[2],box[3]])
 			self_.auto_lines.append([box[3],box[0]])
 		
-		# # rect constructor ------
-		# (x,y,w,h) = cv2.boundingRect(c)
-		# boxes.append([x,y,x+w, y+h])
-		# cv2.rectangle(image, (x,y), (x+w,y+h),(0,0,255),2)
-		# -----------------------
-		if not cubes[j].isp1p2:
-			image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
-		#cv2.imwrite("rottate_rect.jpg", image)
+
+		# if not cubes[j].isp1p2:
+		# 	image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
 
 		j=j+1
 		if self_.letter_dict[j] == 'Z':
