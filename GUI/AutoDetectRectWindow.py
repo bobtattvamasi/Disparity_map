@@ -6,6 +6,7 @@ from GUI.BaseWindow import BaseWindow
 from db.DBtools import *
 from tools.ImageProccessHelper import autoFindRect
 from config.config import configValues as cfv
+from tools.VertexFinder import VertexFinder
 
 
 class AutoDetectRectWindow(BaseWindow):
@@ -19,6 +20,9 @@ class AutoDetectRectWindow(BaseWindow):
 		self.settings = ('Settings', 'Настройки')
 		self.save_settings = ('save settings', 'сохранить')
 		self.disparity_value = None
+
+		self.left_image = None
+		self.VertexFinder = VertexFinder()
 
 	def run(self, image) -> None:
 		left_column = [[self.sg.Image(filename='', key='cube_image'), self.sg.Image(filename='', key='another_image')],

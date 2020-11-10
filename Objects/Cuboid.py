@@ -7,6 +7,12 @@ from config.config import configValues as cfv
 
 
 class Cuboid(BaseObject):
+
+	def add_ed_box_point_clod(self, pointcloud):
+		pass
+
+	def plane_fitting(self):
+		pass
 	
 	# Оставляем
 	#@timer
@@ -23,7 +29,7 @@ class Cuboid(BaseObject):
 
 		# directly warp the rotated rectangle to get the straightened rectangle
 		warped = cv2.warpPerspective(image, M, (self.width, self.height))
-		cv2.imwrite(f"data/croped_images/croped_image{self.number+1}.jpg", warped)
+		#cv2.imwrite(f"data/croped_images/croped_image{self.number+1}.jpg", warped)
 		return warped
 
 	# Выкидываем
@@ -72,80 +78,261 @@ class Cuboid(BaseObject):
 
 			cv2.imwrite(f'data/work_on_contour_redraw/cube_mask_{self.number}.jpg', thresh)
 
+	def find_main_vertex(self, image):
+		
+
+		big_black_image = np.zeros((720,1280, 3), np.uint8)
+
+		listOfCoordinates = self.get_disparity_values_by_last_quart()
+		rotated_indexes = []
+		for index in listOfCoordinates:
+			index = self.rotate_xy_from_rect_coord_system(index)
+			rotated_indexes.append(index)
+			self.draw_point(big_black_image,index, color=(255,255,255))
+			#self.draw_point(image,index, color=(255,255,255))
+
+		big_gray = cv2.cvtColor(big_black_image, cv2.COLOR_BGR2GRAY)
+		big_blur = cv2.GaussianBlur(big_gray, (3,3), 0)
+
+		big_thresh = cv2.threshold(big_blur, 240,255, cv2.THRESH_BINARY)[1]
+
+		big_cnts = cv2.findContours(big_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+		big_cnts = big_cnts[0] if len(big_cnts) == 2 else big_cnts[1]
+		cv2.drawContours(big_black_image, big_cnts, -1, (0, 255, 0), 2)
+		#self.draw_text_point(big_black_image, self.vertexes[6], " 6", textcolor=(0,0,255))
+		#self.draw_text_point(big_black_image, self.vertexes[7], " 7", textcolor=(0,0,255))
+		#cv2.imwrite(f'data/big_black_images/cube_mask_{self.number}.jpg', big_black_image)
+		big_c = max(big_cnts, key=cv2.contourArea)
+
+		new_vertexes = self.vertexes[:6]
+
+		dist6 = cv2.pointPolygonTest(big_c, tuple(self.vertexes[6]),True)
+		dist7 = cv2.pointPolygonTest(big_c, tuple(self.vertexes[7]),True)
+		if dist6 > dist7:
+			#print(6)
+			new_vertexes.append(self.vertexes[6])
+		else:
+			#print(7)
+			new_vertexes.append(self.vertexes[7])
+		# for i,pt in enumerate(self.vertexes[6:]):
+		# 	aa = cv2.pointPolygonTest(big_c, tuple(pt),True)
+		# 	print(f'aa = {aa}')
+		# 	if aa == 0 or aa == 1:
+		# 		ii.append(i+6)
+		# if 6 in ii:
+		# 	print(6)
+		# 	new_vertexes.append(self.vertexes[6])
+		# elif 7 in ii:
+		# 	print(7)
+		# 	new_vertexes.append(self.vertexes[7])
+		self.vertexes = new_vertexes
+		#print(f'self.vertexes = {self.vertexes}')
+
+
+
 	# Функция где мы находим линию ребра
 	def find_edge_points(self, image):
 		if self.main_vertex is None:
-			print(f"average_disparity_value: {self.average_disparity_value}")
-			print(f"max_disparity_value: {self.max_disparity_value}")
-			print(f"min_disparity_value : {self.min_disparity_value}")
+			#print(f"average_disparity_value: {self.average_disparity_value}")
+			#print(f"max_disparity_value: {self.max_disparity_value}")
+			#print(f"min_disparity_value : {self.min_disparity_value}")
 
 			# Найти на картинке бокса особенные точки
-			height, width = self.Mat_image.shape[:2]
-			black_image = np.zeros((height,width, 3), np.uint8)
-			black_image[:] = (255,0,0)
+			#height, width = self.Mat_image.shape[:2]
+			#black_image = np.zeros((height,width, 3), np.uint8)
+			big_black_image = np.zeros((720,1280, 3), np.uint8)
+			#black_image[:] = (255,0,0)
 			# Нарисовать эти точки на черном изображении того же размера
 
 			# Работать с этими точками...
 			listOfCoordinates = self.get_disparity_values_by_last_quart()
+			rotated_indexes = []
 
 			for index in listOfCoordinates:
-				self.draw_point(black_image, index, color=(255,255,255))
-
-			gray = cv2.cvtColor(black_image, cv2.COLOR_BGR2GRAY)
-			blur = cv2.GaussianBlur(gray, (3,3), 0)
-
-			thresh = cv2.threshold(blur, 240,255, cv2.THRESH_BINARY)[1]
-
-			cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-			cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-			c = max(cnts, key=cv2.contourArea)
-
-			# Obtain outer coordinates
-			left = tuple(c[c[:, :, 0].argmin()][0])
-			right = tuple(c[c[:, :, 0].argmax()][0])
-			top = tuple(c[c[:, :, 1].argmin()][0])
-			bottom = tuple(c[c[:, :, 1].argmax()][0])
-
-			cv2.rectangle(black_image, (left[0], top[1]), (right[0], bottom[1]), (255, 255, 255), 2)
-
-			small_width = right[0] - left[0]
-			small_height = bottom[1] - right[1]
-
-			print(f'width  = {width}; height  = {height}')
-			print(f'small_w= {small_width}; small_h={small_height}')
-
-			center_x = left[0] + small_width//2
-			center_y = right[0] + small_height//2
-
-			eps = 30
-
-			p1,p2 = None,None
+				#self.draw_point(black_image, index, color=(255,255,255))
+				index = self.rotate_xy_from_rect_coord_system(index)
+				rotated_indexes.append(index)
+				self.draw_point(big_black_image,index, color=(255,255,255))
 			
-			if (width - small_width) <= eps:
-				print ('first')
-				self.draw_line(black_image, (0,center_y), (width, center_y), color=(255,255,255))
 
-				p1,p2 = (0,center_y), (width, center_y)
+			# gray = cv2.cvtColor(black_image, cv2.COLOR_BGR2GRAY)
+			# blur = cv2.GaussianBlur(gray, (3,3), 0)
+
+			# thresh = cv2.threshold(blur, 240,255, cv2.THRESH_BINARY)[1]
+
+			# cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			# cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+			# c = max(cnts, key=cv2.contourArea)
+
+			big_gray = cv2.cvtColor(big_black_image, cv2.COLOR_BGR2GRAY)
+			big_blur = cv2.GaussianBlur(big_gray, (3,3), 0)
+
+			big_thresh = cv2.threshold(big_blur, 240,255, cv2.THRESH_BINARY)[1]
+
+			big_cnts = cv2.findContours(big_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			big_cnts = big_cnts[0] if len(big_cnts) == 2 else big_cnts[1]
+			cv2.drawContours(big_black_image, big_cnts, -1, (0, 255, 0), 2)
+			#cv2.imwrite(f'data/big_black_images/cube_mask_{self.number}.jpg', big_black_image)
+			big_c = max(big_cnts, key=cv2.contourArea)
+
+
+			#print(self.vertexes)
+			new_vertexes = self.vertexes[:2]
+			second_part_of_verxes = self.vertexes[2:4]
+			#print(second_part_of_verxes)
+			ii = []
+			for i,pt in enumerate(self.vertexes[4:]):
+				aa = cv2.pointPolygonTest(big_c, tuple(pt),False)
+				if aa == 0 or aa == 1:
+					#print(f"i  = {i+4}, pointPolygonTest = {aa}")
+					ii.append(i+4)
+			if 4 in ii or 5 in ii:
+				new_vertexes.append(self.vertexes[5])
+
+				new_vertexes.append(second_part_of_verxes[0])
+				new_vertexes.append(second_part_of_verxes[1])
+
+				new_vertexes.append(self.vertexes[4])
+				#print("edge_4,5")
+			elif 6 in ii or 7 in ii:
+				new_vertexes.append(self.vertexes[7])
+
+				new_vertexes.append(second_part_of_verxes[0])
+				new_vertexes.append(second_part_of_verxes[1])
+
+				new_vertexes.append(self.vertexes[6])
+				#print("edge_6,7")
+			else:
+				new_vertexes.append(second_part_of_verxes[0])
+				new_vertexes.append(second_part_of_verxes[1])
+
+			self.vertexes = new_vertexes
+
 			
-			elif (height - small_height) <= eps:
-				print ('second')
-				self.draw_line(black_image, (center_x,0), (center_x, height), color=(255,255,255))
 
-				p1,p2 = (center_x,0), (center_x, height)
 
-			#cv2.imwrite(f'data/work_on_aprox_line/cube_mask_{self.number}.jpg', black_image)
-			#cv2.imwrite(f'data/work_on_aprox_line/cube_{self.number}.jpg', self.Mat_image)
+			
 
-			self.edge_points = [p1,p2]
+			# # Obtain outer coordinates
+			# left = tuple(c[c[:, :, 0].argmin()][0])
+			# right = tuple(c[c[:, :, 0].argmax()][0])
+			# top = tuple(c[c[:, :, 1].argmin()][0])
+			# bottom = tuple(c[c[:, :, 1].argmax()][0])
 
-			print(f"p1,p2 = {p1}, {p2}")
+			# cv2.rectangle(black_image, (left[0], top[1]), (right[0], bottom[1]), (255, 255, 255), 2)
+			
+			# self.draw_circle(black_image, left, color=(255,255,0))
+			# self.draw_circle(black_image, top, color=(255,255,0))
+			# self.draw_circle(black_image, right, color=(255,255,0))
+			# self.draw_circle(black_image, bottom, color=(255,255,0))
+			
+			# self.draw_circle(black_image, (left[0], top[1]), color=(0,255,255))
+			# self.draw_circle(black_image, (right[0], bottom[1]), color=(0,255,255))
+			# self.draw_circle(black_image, (left[0], bottom[1]), color=(0,255,255))
+			# self.draw_circle(black_image, (right[0], top[1]), color=(0,255,255))
 
-			#if not is_line_out_of_box(p1,p2, box):
-			if (p1 != None) and (p2 != None):
-				p1 = self.rotate_xy_from_rect_coord_system(p1)
-				p2 = self.rotate_xy_from_rect_coord_system(p2)
+			# # coef = 5
+			# # def rectContains(rect,pt):
+			# # 	logic = rect[0]+coef < pt[0] < rect[0]+rect[2]-coef and rect[1]+coef < pt[1] < rect[1]+rect[3]-coef
+			# # 	return logic
 
-				self.draw_line(image, p1, p2)
+			# # rpt1 = self.rotate_xy_from_rect_coord_system([left[0], top[1]])
+			# # rpt2 = self.rotate_xy_from_rect_coord_system([right[0], bottom[1]])
+			# # rect = (rpt1[0], rpt1[1], rpt2[0], rpt2[1])
+
+			# # # self.draw_text_point(image, rpt1, "Point 1")
+			# # # self.draw_text_point(image, rpt2, "Point 2")
+
+			# # cv2.rectangle(image, (int(rpt1[0]), int(rpt1[1])), (int(rpt2[0]), int(rpt2[1])), (255, 255, 255), 2)
+
+			# # for i,pt in enumerate(self.vertexes[3:]):
+			# # 	if rectContains(rect, pt):
+			# # 		print(f"i={i}, True")
+
+			# small_width = right[0] - left[0]
+			# small_height = bottom[1] - top[1]
+
+			# #print(f'width  = {width}; height  = {height}')
+			# #print(f'small_w= {small_width}; small_h={small_height}')
+
+			# center_x = left[0] + small_width//2
+			# center_y = right[0] + small_height//2
+
+			# eps = 30
+
+			# p1,p2 = None,None
+			
+			# if (width - small_width) <= eps:
+			# 	#print ('first')
+			# 	self.draw_line(black_image, (0,center_y), (width, center_y), color=(255,255,255))
+
+			# 	p1,p2 = (0,center_y), (width, center_y)
+			
+			# elif (height - small_height) <= eps:
+			# 	#print ('second')
+			# 	self.draw_line(black_image, (center_x,0), (center_x, height), color=(255,255,255))
+
+			# 	p1,p2 = (center_x,0), (center_x, height)
+
+			# cv2.imwrite(f'data/work_on_aprox_line/cube_mask_{self.number}.jpg', black_image)
+			# cv2.imwrite(f'data/work_on_aprox_line/cube_{self.number}.jpg', self.Mat_image)
+
+			# self.edge_points = [p1,p2]
+
+			# #print(f"p1,p2 = {p1}, {p2}")
+
+			# #if not is_line_out_of_box(p1,p2, box):
+			# if (p1 != None) and (p2 != None):
+			# 	p1 = self.rotate_xy_from_rect_coord_system(p1)
+			# 	p2 = self.rotate_xy_from_rect_coord_system(p2)
+
+				#self.draw_line(image, p1, p2)
+	
+	def rebuild_points_lines(self, image):
+		pass
+		# new_vertexes = []
+		# self.edge_case = []
+		# p1 = self.rotate_xy_from_rect_coord_system(self.edge_points[0])
+		# p2 = self.rotate_xy_from_rect_coord_system(self.edge_points[1])
+		# for i in range(len(self.vertexes)):
+		# 	k=i+1
+		# 	if k == 4:
+		# 		k=0
+		# 	print(f'i = {i}')
+		# 	print(f'k = {k}')
+		# 	point = self.line_intersection([self.vertexes[i],self.vertexes[k]], [p1,p2])
+		# 	#print(f'point = {point}')
+		# 	if point:
+		# 		#print(f'cases = {i}')
+		# 		new_vertexes.append([point[0],point[1]])
+		# 		self.edge_case.append(i)
+		
+		# if len(new_vertexes) == 2:
+		# 	#print(f'casecase = {self.edge_case[0]}')
+		# 	k=0
+		# 	if self.edge_case[0] == 1:
+		# 		copy_vertexes = self.vertexes
+		# 		self.vertexes = []
+		# 		for i in range(len(copy_vertexes)):
+		# 			self.vertexes.append(copy_vertexes[i])
+		# 			if i%2 == 1:
+		# 				self.vertexes.append(new_vertexes[k])
+		# 				k=k+1
+					
+		# 	elif self.edge_case[0] == 0:
+		# 		copy_vertexes = self.vertexes
+		# 		self.vertexes = []
+		# 		for i in range(len(copy_vertexes)):
+		# 			self.vertexes.append(copy_vertexes[i])
+		# 			if i%2 == 0:
+		# 				self.vertexes.append(new_vertexes[k])
+		# 				k=k+1
+		#self.draw_circle(image, self.vertexes[4])
+		# self.draw_text_point(image, self.vertexes[4], " 4", textcolor=(0,0,255))
+		# self.draw_text_point(image, self.vertexes[5], " 5", textcolor=(0,0,255))
+		# self.draw_text_point(image, self.vertexes[6], " 6", textcolor=(0,0,255))
+		# self.draw_text_point(image, self.vertexes[7], " 7", textcolor=(0,0,255))
+				 
 		
 
 
@@ -168,7 +355,7 @@ class Cuboid(BaseObject):
 		
 		
 		#Все найденные вершины будут храниться здесь
-		self.vertexes = None
+		self.vertexes = []
 		self.main_vertex = None
 		# Угол между нижней вертикалью и нижним ребром найденного кубоида 
 		self.rectangle_angle = self._angle_between_two_lines((self.box[1], self.box[2]), (self.box[1],(self.box[1][0]+10, self.box[1][1])))
@@ -177,9 +364,58 @@ class Cuboid(BaseObject):
 		self.edge_points = [None,None]
 		self.disparity_line_points = []
 		self.isp1p2 = False
+		
+		self.edge_case = []
 
 		# About point clouds
 		self.pointcloud = None
+
+	def add_vertexes(self, corners):
+		for i in corners:
+			for k in i.keys():
+				pt = i[k][0]
+				self.vertexes.append([pt[0][0]+cfv.desck_Y1, pt[0][1]])
+
+	def add_four_vertexes(self):
+		self.vertexes = self.vertexes[:4]
+
+	def add_lines(self):
+		if len(self.vertexes) == 4:
+			for i in range(len(self.vertexes)):
+				k=i+1
+				if k==4:
+					k=0
+				self.lines.append([self.vertexes[i], self.vertexes[k]])
+
+		elif len(self.vertexes) == 7:
+			for i in range(7):
+				k=i+1
+				if k==7:
+					k=1
+				# if k ==6:
+				# 	k=7
+				self.lines.append([self.vertexes[i], self.vertexes[k]])
+			self.lines.append([self.vertexes[0], self.vertexes[5]])
+			self.lines.append([self.vertexes[3], self.vertexes[6]])
+		
+		elif len(self.vertexes) == 6:
+			for i in range(6):
+				k=i+1
+				if k==6:
+					k=0
+				self.lines.append([self.vertexes[i], self.vertexes[k]])
+			self.lines.append([self.vertexes[2], self.vertexes[5]])
+				
+			# if self.edge_case[0] == 1:
+			# 	self.lines.append([self.vertexes[2], self.vertexes[5]])	
+			# elif self.edge_case[0] == 0:
+			# 	self.lines.append([self.vertexes[1], self.vertexes[4]])
+	
+	def draw_vertexes(self,image):
+		for i,v in enumerate(self.vertexes):
+			cv2.circle(image, (int(v[0]), int(v[1])), 6, (255, 0, 255), 3)
+				
+
 		
 	@property
 	def average_disparity_value(self):
@@ -191,7 +427,7 @@ class Cuboid(BaseObject):
 	def min_disparity_value(self):
 		return np.argmin(self.Mat_disparity_crop)
 
-	def get_quantiles(self,quartos=[0.25,0.5,0.8,0.92]):
+	def get_quantiles(self,quartos=[0.25,0.5,0.8,0.88]):
 		return np.quantile(self.Mat_disparity_crop, quartos)
 	
 	def get_disparity_values_by_last_quart(self):
@@ -226,7 +462,7 @@ class Cuboid(BaseObject):
 			self.lines.append([edge_p0, edge_p1])
 
 	def draw_all_lines(self,image):
-		print(f"LINES : {self.lines}")
+		#print(f"LINES : {self.lines}")
 		for i in range(len(self.lines)):
 			self.draw_line(image, self.lines[i][0],self.lines[i][1])
 
@@ -269,7 +505,7 @@ class Cuboid(BaseObject):
 			for j in range(self.height-1):
 				point = self.rotate_xy_from_rect_coord_system([i,j])
 				point = self.boundary_condition(point)
-				self.draw_circle(image, point)
+				#self.draw_circle(image, point)
 				#print(f"point = {point}")
 				# if int(point[0]) == 720:
 				# 	point[0] = 719
@@ -305,30 +541,30 @@ class Cuboid(BaseObject):
 		pass
 
 		# Находим индексы экстремальных точек
-		# indexes = self.find_extremum_points()
+		# ~ indexes = self.find_extremum_points()
 
-		# Если вершины нет, то находим внутренее ребро и отрисовываем его
-		# if self.main_vertex == None:
-		# 	self.find_edge_points()
-		# 	p1,p2 = self.edge_points
-		# 	print(f"p1,p2 = {p1}, {p2}")
+		# ~ # Если вершины нет, то находим внутренее ребро и отрисовываем его
+		# ~ if self.main_vertex == None:
+			# ~ self.find_edge_points(image)
+			# ~ p1,p2 = self.edge_points
+			# ~ print(f"p1,p2 = {p1}, {p2}")
 
-		# 	#if not is_line_out_of_box(p1,p2, box):
-		# 	if (p1 != None) and (p2 != None):
-		# 		p1 = self.rotate_xy_from_rect_coord_system(p1)
-		# 		p2 = self.rotate_xy_from_rect_coord_system(p2)
+			# ~ #if not is_line_out_of_box(p1,p2, box):
+			# ~ if (p1 != None) and (p2 != None):
+				# ~ p1 = self.rotate_xy_from_rect_coord_system(p1)
+				# ~ p2 = self.rotate_xy_from_rect_coord_system(p2)
 
-		# 		self.draw_line(image, p1, p2)
+				# ~ self.draw_line(image, p1, p2)
 		
-		#disp = self.rebuld_disparity_map_by_rect(disp)
+		# ~ #disp = self.rebuld_disparity_map_by_rect(disp)
 
-		# disp_values_in_extremum = []
-		# for index in indexes:
-		# 	index = self.rotate_xy_from_rect_coord_system(index)
+		# ~ disp_values_in_extremum = []
+		# ~ for index in indexes:
+			# ~ index = self.rotate_xy_from_rect_coord_system(index)
 
-		# 	# Рисуются точки экстремума на карте
-		# 	#self.draw_circle(image, index)
-		# 	disp_values_in_extremum.append(disp[int(index[1]),int(index[0])])
+			# ~ # Рисуются точки экстремума на карте
+			# ~ #self.draw_circle(image, index)
+			# ~ disp_values_in_extremum.append(disp[int(index[1]),int(index[0])])
 		
 		#self.isp1p2 = False
 		#list_of_lines = []
@@ -526,8 +762,8 @@ class Cuboid(BaseObject):
 
 	# Рисует маленькую окружность
 	@staticmethod
-	def draw_circle(img, point):
-		cv2.circle(img, (int(point[0]), int(point[1])), 3, (255,255,255), 2)
+	def draw_circle(img, point, color=(255,255,255)):
+		cv2.circle(img, (int(point[0]), int(point[1])), 3, color, 2)
 		#cv2.putText(img,'max',(int(point[0]),int(point[1]+3)),fontFace=cv2.FONT_HERSHEY_SIMPLEX,fontScale=1, color=(255,255,255), thickness = 3)
 
 	# Рисуется прямая по двум точкам
@@ -560,6 +796,12 @@ class Cuboid(BaseObject):
 		d = (det(*line1), det(*line2))
 		x = det(d, xdiff) / div
 		y = det(d, ydiff) / div
+		array = [[line1[0]], [line2[0]], [line1[1]], [line2[1]]]
+		# contour = [np.array([[line1[0]], [line2[0]], [line1[1]], [line2[1]]], dtype=np.int32)]
+		contour = np.array(array).reshape((-1,1,2)).astype(np.int32)
+		is_in_contour = cv2.pointPolygonTest(contour, (x,y),False)
+		if is_in_contour == -1 or is_in_contour == 0:
+			return False
 		return x,y
 
 	# Пересекает ли линия entry edge c линии бокса

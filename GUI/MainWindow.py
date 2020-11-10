@@ -11,10 +11,11 @@ import imutils
 # Imports from files
 from GUI.BaseWindow import BaseWindow
 from config.config import configValues as cfv
-from tools.ImageProccessHelper import calibrate_two_images, stereo_depth_map, resize_rectified_pair, autoFindRect
+from tools.ImageProccessHelper import calibrate_two_images, StereoDepthMap, resize_rectified_pair, autoFindRect
 from GUI.AutoDetectRectWindow import AutoDetectRectWindow
 from GUI.PointCloudWindow import PointCloudWindow
 #from FPS_test import PiVideoStream
+from tools.VertexFinder import VertexFinder
 
   
 
@@ -27,6 +28,7 @@ class MainWindow(BaseWindow):
 		photo_files = []
 		i = 0
 		for file in glob.glob(path_to_imagesFolder):
+			#print(file)
 			photo_files.append(file)
 		return photo_files, i
 
@@ -184,6 +186,11 @@ class MainWindow(BaseWindow):
 		# переменные для хранения изображений карт несоответсвий
 		self.disparity_to_show = np.zeros((cfv.WINDOW_HEIGHT, cfv.WINDOW_WIDTH), np.uint8)
 		self.disparity = np.zeros((cfv.IMAGE_HEIGHT,cfv.IMAGE_WIDTH), np.uint8)
+
+		self.left_image = None
+		self.VertexFinder = VertexFinder()
+
+		self.stereo_depth_map = StereoDepthMap()
 		
 		
 	def lineFinder(self) -> None:
@@ -204,6 +211,8 @@ class MainWindow(BaseWindow):
 			imageToDisp = frame
 
 			imgL, imgR = calibrate_two_images(imageToDisp, self.ifCamPi)
+			self.left_image = imgL
+			self.autoFinderWindow.left_image = imgL
 			rectified_pair = (imgR, imgL)
 			
 			try:
@@ -389,10 +398,11 @@ class MainWindow(BaseWindow):
 				print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
 		
 	def deepMap_updater(self,imageToDisp, values):
+		print(imageToDisp)
 		imgL, imgR = calibrate_two_images(imageToDisp, self.ifCamPi)
 		rectified_pair = (imgL, imgR)	
 		self.db.update_mWinParameters(values)
-		return stereo_depth_map(rectified_pair, self.db.mWinParameters)
+		return self.stereo_depth_map.stereo_depth_map(rectified_pair, self.db.mWinParameters)
 
 	# Функция, находящее расстояние между двумя точками в псевдо-3д просстранстве
 	def old_determine_line(self, line, baseline=0.065, focal=1442, rescale=1)-> float:

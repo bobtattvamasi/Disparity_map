@@ -69,78 +69,80 @@ def resize_rectified_pair(rectified_pair):
 	imgLs = cv2.resize (rectified_pair[0], dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
 	return imgLs, imgRs
 
-autotune_min = 10000000
-autotune_max = -10000000
+class StereoDepthMap:
+	def __init__(self):
+		self.autotune_min = 10000000
+		self.autotune_max = -10000000
 
-# Находит по стереопаре карту несоответсвий
-def stereo_depth_map(rectified_pair, parameters, filtering=False):
-	dmLeft = rectified_pair[0]
-	dmRight = rectified_pair[1]
+	# Находит по стереопаре карту несоответсвий
+	def stereo_depth_map(self, rectified_pair, parameters, filtering=False):
+		dmLeft = rectified_pair[0]
+		dmRight = rectified_pair[1]
 
-	#disparity = np.zeros((c,r), np.uint8)
-	sbm = cv2.StereoBM_create(numDisparities=16, blockSize=15)
-	
-	sbm.setPreFilterType(1)
-	sbm.setPreFilterSize(parameters['PFS'])
-	sbm.setPreFilterCap(parameters['PreFiltCap'])
-	sbm.setMinDisparity(parameters['MinDISP'])
-	sbm.setNumDisparities(parameters['NumOfDisp'])
-	sbm.setTextureThreshold(parameters['TxtrThrshld'])
-	sbm.setUniquenessRatio(parameters['UnicRatio'])
-	sbm.setSpeckleRange(parameters['SpcklRng'])
-	sbm.setSpeckleWindowSize(parameters['SpklWinSze'])	
-	
-	
-	disparity = sbm.compute(dmLeft, dmRight)
-	old_disparity = disparity
-
-	# Пред-фильтрация
-	#disparity = a_tricky_filter_old(old_disparity)
-
-	# Жесткая фильтрация. Скорее всего от нее откажемся.
-	if filtering:
-		wls_filter = cv2.ximgproc.createDisparityWLSFilter(sbm)
-		right_matcher = cv2.ximgproc.createRightMatcher(sbm)
-		right_disp = right_matcher.compute(dmRight, dmLeft)
+		#disparity = np.zeros((c,r), np.uint8)
+		sbm = cv2.StereoBM_create(numDisparities=16, blockSize=15)
 		
-		wls_filter.setLambda(parameters['lambda'])	
-		wls_filter.setSigmaColor(parameters['sigmaColor'])
-		wls_filter.setDepthDiscontinuityRadius(parameters['Radius'])
-		wls_filter.setLRCthresh(parameters['LRCthresh'])
+		sbm.setPreFilterType(1)
+		sbm.setPreFilterSize(parameters['PFS'])
+		sbm.setPreFilterCap(parameters['PreFiltCap'])
+		sbm.setMinDisparity(parameters['MinDISP'])
+		sbm.setNumDisparities(parameters['NumOfDisp'])
+		sbm.setTextureThreshold(parameters['TxtrThrshld'])
+		sbm.setUniquenessRatio(parameters['UnicRatio'])
+		sbm.setSpeckleRange(parameters['SpcklRng'])
+		sbm.setSpeckleWindowSize(parameters['SpklWinSze'])	
+		
+		
+		disparity = sbm.compute(dmLeft, dmRight)
+		old_disparity = disparity
 
-		disparity = wls_filter.filter(disparity, dmLeft, disparity_map_right=right_disp )
+		# Пред-фильтрация
+		#disparity = a_tricky_filter_old(old_disparity)
+
+		# Жесткая фильтрация. Скорее всего от нее откажемся.
+		if filtering:
+			wls_filter = cv2.ximgproc.createDisparityWLSFilter(sbm)
+			right_matcher = cv2.ximgproc.createRightMatcher(sbm)
+			right_disp = right_matcher.compute(dmRight, dmLeft)
+			
+			wls_filter.setLambda(parameters['lambda'])	
+			wls_filter.setSigmaColor(parameters['sigmaColor'])
+			wls_filter.setDepthDiscontinuityRadius(parameters['Radius'])
+			wls_filter.setLRCthresh(parameters['LRCthresh'])
+
+			disparity = wls_filter.filter(disparity, dmLeft, disparity_map_right=right_disp )
+			#disparity_value = filtering_box(disparity_value)
+
+		
+
+		local_max = disparity.max()
+		local_min = disparity.min()
+
+		#print(f"local max = {local_max}, local_min = {local_min}")
+
+		#global autotune_max, autotune_min
+		self.autotune_max = max(self.autotune_max, disparity.max())
+		self.autotune_min = min(self.autotune_min, disparity.min())
+		# autotune_max = local_max
+		# autotune_min = local_min
+
+		disparity_grayscale = (disparity-self.autotune_min)*(65535.0/(self.autotune_max-self.autotune_min))
+		disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+		disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
+
+		disparity_value = disparity.astype(np.float32) / 16.0
+
+		# Здесь происходит фильтрация карты
+		#disparity_value = a_tricky_filter(disparity_value)
 		#disparity_value = filtering_box(disparity_value)
 
-	
-
-	local_max = disparity.max()
-	local_min = disparity.min()
-
-	#print(f"local max = {local_max}, local_min = {local_min}")
-
-	global autotune_max, autotune_min
-	# autotune_max = max(autotune_max, disparity.max())
-	# autotune_min = min(autotune_min, disparity.min())
-	autotune_max = local_max
-	autotune_min = local_min
-
-	disparity_grayscale = (disparity-autotune_min)*(65535.0/(autotune_max-autotune_min))
-	disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
-	disparity_color = cv2.applyColorMap(disparity_fixtype, cv2.COLORMAP_JET)
-
-	disparity_value = disparity.astype(np.float32) / 16.0
-
-	# Здесь происходит фильтрация карты
-	#disparity_value = a_tricky_filter(disparity_value)
-	#disparity_value = filtering_box(disparity_value)
-
-	# Находим количество файлов в папке и сохраняем нашу карту глубин
-	path = 'data/good_depth_maps'
-	num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
-	cv2.imwrite(path + f'/map_{num_files+1}.jpg', disparity_color)
+		# Находим количество файлов в папке и сохраняем нашу карту глубин
+		path = 'data/good_depth_maps'
+		num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
+		cv2.imwrite(path + f'/map_{num_files+1}.jpg', disparity_color)
 
 
-	return disparity_color, disparity_value #disparity.astype(np.float32) / 16.0
+		return disparity_color, disparity_value #disparity.astype(np.float32) / 16.0
 
 # def do_in_slide_window(roi)
 # 	value = np.quantile(roi, [0.92])
@@ -290,6 +292,12 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 	# найденных кубоидов
 	cubes = []
 
+	# Метод поиска вершины из VertexFinder
+	corners,_,nvxt = self_.VertexFinder.find_corners(self_.left_image)
+	#self_.VertexFinder.draw_corners(image,_,corners)
+	number_of_vertexes = self_.VertexFinder.return_number_of_vertexes(corners)
+
+
 	for i,c in enumerate(cnts):
 
 		# Находится площадь контура 
@@ -301,7 +309,23 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		peri = cv2.arcLength(c, True)
 		if peri < 300:
 			continue
-		# 337-24-82
+
+		is_in_contour = -1
+		index_corner = 0
+
+		# Проверяем, есть ли хотя бы одна вершина внутри нашего найденного по карте глубин кубе
+		for ind,corn in enumerate(corners):
+			for k in corn.keys():
+				pt = corn[k][0]
+				ptt = [pt[0][0]+configValues.desck_Y1, pt[0][1]]
+				#print(f'ptt = {ptt}')
+				is_in_contour = cv2.pointPolygonTest(c, tuple(ptt),False)
+				if is_in_contour == 1 or is_in_contour == 0:
+					index_corner = ind
+					break
+			if is_in_contour == 1 or is_in_contour == 0:
+				index_corner = ind
+				break
 
 		# Считаются центры масс контуров, затем детектируется имя формы, используя только контор
 		M = cv2.moments(c)
@@ -324,33 +348,54 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		# Создаем прямоугольник под углом через контур
 		rect = cv2.minAreaRect(c)
 
-
 		disp = self_.disparity_value
-		#if j == 1:
-		
-		
 		# Заполняем массив кубоидами по прямоугольникам
 		cubes.append(Cuboid(image, disp, rect,j))
 		
+		
 		#------ Здесь происходит поиск ключевых объектов внутри найденных предметов
+		if is_in_contour == 1 or is_in_contour == 0:
+			print(number_of_vertexes[index_corner])
 
-		# Нахожу лишь одну вершину
-		cubes[j].find_only_one_vertex(image, disp)
-		cubes[j].find_edge_points(image)
-		cubes[j].create_lines()
-		cubes[j].draw_all_lines(image)
+			# Добавляем все найденные вершины если не 4 вершины
+			cubes[j].add_vertexes([corners[index_corner]])
+			# Если четыре и нет внутри других вершин, то берем только 4
+			if number_of_vertexes[index_corner] == 4:
+				cubes[j].add_four_vertexes()
+			
+			
+			# Количество углов у контура
+			n = nvxt[index_corner]
 
-		#self_.disparity_value = cubes[j].find_vertex(image, disp)
+			if n == 4 and number_of_vertexes[index_corner] != 4:
+				cubes[j].rebuild_points_lines(image)
+				cubes[j].find_edge_points(image)
+			elif n == 6:
+				cubes[j].find_main_vertex(image)
+			
+			cubes[j].add_lines()
+			cubes[j].draw_vertexes(image)
+			cubes[j].draw_all_lines(image)
+			
+			
+		else:
+			# Нахожу лишь одну вершину
+			cubes[j].find_only_one_vertex(image, disp)
+			#cubes[j].find_edge_points(image)
+			cubes[j].create_lines()
+			cubes[j].draw_all_lines(image)
+
+			self_.disparity_value = cubes[j].find_vertex(image, disp)
 
 
 		# Играемся с перерисовыванием контуров внутри бокса
-		# cubes[j].test_with_vertexbox(self_.db.aDRWinParameters)
+		#cubes[j].test_with_vertexbox(self_.db.aDRWinParameters)
 
 		# cubes[j].fill_crop_test(image, self_.disparity_value)
 		#------ 
 
 		box = np.int0(cv2.boxPoints(rect))
-		print(f'box = {box}')
+		#print(f'box = {box}')
 		#-------------------------
 		if ifPrintRect:
 			print(f"object {j+1}:")
@@ -401,6 +446,10 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		if self_.letter_dict[j] == 'Z':
 			j=0
 			mul_coef = mul_coef + 1
+	
+	path = 'data/test_results'
+	num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
+	cv2.imwrite(path + f'/map_{num_files+1}.jpg', image)
 
 	return mask_frame, thresh
 
