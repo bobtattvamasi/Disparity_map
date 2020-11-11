@@ -97,7 +97,7 @@ class StereoDepthMap:
 		old_disparity = disparity
 
 		# Пред-фильтрация
-		#disparity = a_tricky_filter_old(old_disparity)
+		disparity = a_tricky_filter_old(old_disparity)
 
 		# Жесткая фильтрация. Скорее всего от нее откажемся.
 		if filtering:
@@ -161,7 +161,7 @@ def a_tricky_filter_old(disparity_values):
 
 	#disparity_values[:,:320][disparity_values[:,:320]>3488]=3488
 	#disparity_values[:,320:][(disparity_values[:,320:]>5000)]=4164
-	disparity_values[:,320:][(disparity_values[:,320:]<4161)]=4161
+	disparity_values[:,320:][(disparity_values[:,320:]<4060)]=4060
 
 	return disparity_values
 
@@ -288,6 +288,8 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 	# потому что, мы начинаем их сначала искать
 	self_.auto_lines = []
 
+	pointcloud = self_.Window3D.pointcloud
+
 	# Вводим список для хранения 
 	# найденных кубоидов
 	cubes = []
@@ -355,7 +357,7 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		
 		#------ Здесь происходит поиск ключевых объектов внутри найденных предметов
 		if is_in_contour == 1 or is_in_contour == 0:
-			print(number_of_vertexes[index_corner])
+			#print(number_of_vertexes[index_corner])
 
 			# Добавляем все найденные вершины если не 4 вершины
 			cubes[j].add_vertexes([corners[index_corner]])
@@ -367,25 +369,33 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 			# Количество углов у контура
 			n = nvxt[index_corner]
 
+			# Для кубов с ребром кверху
 			if n == 4 and number_of_vertexes[index_corner] != 4:
-				cubes[j].rebuild_points_lines(image)
+				#cubes[j].rebuild_points_lines(image)
 				cubes[j].find_edge_points(image)
+			# Для кубов вершиной кверху
 			elif n == 6:
 				cubes[j].find_main_vertex(image)
+				cubes[j].correct_vertexes_with_main(disp)
+
+			# Анализируем расстояния
+			cubes[j].analysis_distance(disp, pointcloud)
+			cubes[j].correct_distance_values(pointcloud)
 			
 			cubes[j].add_lines()
 			cubes[j].draw_vertexes(image)
 			cubes[j].draw_all_lines(image)
 			
 			
-		else:
+		#else:
+			#continue
 			# Нахожу лишь одну вершину
-			cubes[j].find_only_one_vertex(image, disp)
+			#cubes[j].find_only_one_vertex(image, disp)
 			#cubes[j].find_edge_points(image)
-			cubes[j].create_lines()
-			cubes[j].draw_all_lines(image)
+			# cubes[j].create_lines()
+			# cubes[j].draw_all_lines(image)
 
-			self_.disparity_value = cubes[j].find_vertex(image, disp)
+			# self_.disparity_value = cubes[j].find_vertex(image, disp)
 
 
 		# Играемся с перерисовыванием контуров внутри бокса
@@ -399,36 +409,37 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 		#-------------------------
 		if ifPrintRect:
 			print(f"object {j+1}:")
+
+		
+
+
+
 		# Для того, что бы отобразить размеры всех линий
+		for k in range(len(cubes[j].lines)):
+			cubes[j].lines_dist.append(round(self_.determine_line( [ [int(cubes[j].lines[k][0][0]),int(cubes[j].lines[k][0][1])],[int(cubes[j].lines[k][1][0]),int(cubes[j].lines[k][1][1])] ] ), 2))
 
-		# Линии отображаются с учетом найденного ребра
-		if not cubes[j].isp1p2:
-			for k in range(len(cubes[j].lines)):
-				# last = k+1
-				# if last ==4:
-				# 	last = 0			
-				# cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(box[k][0] + (box[last][0] - box[k][0])/2),int(box[k][1] + (box[last][1] - box[k][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-				# fontScale=1, color=(255,255,255), thickness = 3)
+			cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),
+									int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2 ) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			fontScale=1, color=(255,255,255), thickness = 3)
 
-				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2), int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2 ) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-				fontScale=1, color=(255,255,255), thickness = 3)
+		cubes[j].lines_dist = analys_lines(cubes[j].lines_dist)
+		
+		for k in range(len(cubes[j].lines)):	
+			if ifPrintRect:
+				print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {cubes[j].lines_dist[k]} mm")
+		
+		# # Линии отображаются только по 4м сторонам
+		# else:
+		# for k in range(len(cubes[j].lines)):
+		# 	cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+		# 	fontScale=1, color=(255,255,255), thickness = 3)
+			
+		# 	if ifPrintRect:
+		# 		#cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
+		# 		#cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
 				
-				if ifPrintRect:
-					#print(f"box type = {type(box[k])}")
-					#self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
-					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line( [ [int(cubes[j].lines[k][0][0]),int(cubes[j].lines[k][0][1])], [int(cubes[j].lines[k][1][0]),int(cubes[j].lines[k][1][1])] ] ), 2)} mm")
-		# Линии отображаются только по 4м сторонам
-		else:
-			for k in range(len(cubes[j].lines)):
-				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-				fontScale=1, color=(255,255,255), thickness = 3)
-				
-				if ifPrintRect:
-					#cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
-					#cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
-					
-					self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
-					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
+		# 		self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
+		# 		print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
 		
 
 		if not ifPrintRect:
@@ -452,6 +463,36 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 	cv2.imwrite(path + f'/map_{num_files+1}.jpg', image)
 
 	return mask_frame, thresh
+
+# treak fix distances of lines
+def analys_lines(lines):
+	count40 =0 
+	if len(lines) == 4:
+		for line in lines:
+			if abs(line-40)<3.5:
+				count40 += 1
+		if count40 >2:
+			for i in range(len(lines)):
+				if abs(lines[i]-40)>2.5:
+					lines[i] = 40 + round(lines[i]%1,2)
+	#print(f"count40 = {count40}")
+	elif len(lines) == 7:
+		for line in lines:
+			if abs(line-40)<3.5:
+				count40 += 1
+		if count40 >4:
+			for i in range(len(lines)):
+				if abs(lines[i]-40)>2.5:
+					lines[i] = 40 + round(lines[i]%1,2)
+	elif len(lines) == 9:
+		for line in lines:
+			if abs(line-40)<5:
+				count40 += 1
+		if count40 >5:
+			for i in range(len(lines)):
+				if abs(lines[i]-40)>2.5:
+					lines[i] = 40 + round(lines[i]%1,2)
+	return lines
 
 
 

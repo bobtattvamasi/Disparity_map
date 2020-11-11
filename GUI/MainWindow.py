@@ -155,7 +155,8 @@ class MainWindow(BaseWindow):
 			# Группируем кнопки
 			[self.sg.Frame(self.lineFind3D_Settings[self.language],[
 			# Кнопка для настройки автонахождения линий
-			[self.sg.Button(self.lineFinder_Settings[self.language], size=(15,2)), self.sg.Button(self.D3Cloud_Settings[self.language], size=(15,2))]
+			[#self.sg.Button(self.lineFinder_Settings[self.language], size=(15,2)), 
+			self.sg.Button(self.D3Cloud_Settings[self.language], size=(15,2))]
 			])],
 			# Кнопка для автонахождения линий на картинке
 			[self.sg.Button(self.auto_lineFinder[self.language], size=(15,2))]
@@ -398,7 +399,7 @@ class MainWindow(BaseWindow):
 				print(f"{self.letter_dict[i]} : {round(line_size,2)} mm")
 		
 	def deepMap_updater(self,imageToDisp, values):
-		print(imageToDisp)
+		#print(imageToDisp)
 		imgL, imgR = calibrate_two_images(imageToDisp, self.ifCamPi)
 		rectified_pair = (imgL, imgR)	
 		self.db.update_mWinParameters(values)
@@ -445,11 +446,14 @@ class MainWindow(BaseWindow):
 		B = self.boundary_condition(line[1])
 
 		points = self.Window3D.pointcloud
+		
 		Xa,Ya,Za = points[A[1]][A[0]]
 		Xb,Yb,Zb = points[B[1]][B[0]]
 
+		#print(f'z1 = {Za}, z2 = {Zb}')
+
 		# print(f"point1 = ({Xa}, {Ya},{Za}) ; point2 = ({Xb}, {Yb},{Zb})")
-		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.46-8
+		line_size = abs(math.sqrt(pow(Xb - Xa, 2)+pow(Yb - Ya, 2)+pow(Zb - Za, 2)))*23.52
 
 		return line_size
 	

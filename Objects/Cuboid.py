@@ -8,11 +8,71 @@ from config.config import configValues as cfv
 
 class Cuboid(BaseObject):
 
-	def add_ed_box_point_clod(self, pointcloud):
-		pass
+	# def add_ed_box_point_clod(self, pointcloud):
+	# 	pass
 
-	def plane_fitting(self):
-		pass
+	# def plane_fitting(self):
+	# 	pass
+
+	def small_diff_z_in_square(self):
+		z1 = self.analysis_dict[0][1]
+		z2 = self.analysis_dict[1][1]
+		z3 = self.analysis_dict[2][1]
+		z4 = self.analysis_dict[3][1]
+
+		minus1 = abs(z1-z2)
+		minus2 = abs(z1-z3)
+		minus3 = abs(z1-z4)
+
+		if max([minus1, minus2, minus3]) < 2.1:
+			return True
+		else:
+			return False
+
+	def analysis_distance(self, disp_value, pointcloud):
+		for i, v in enumerate(self.vertexes):
+			# self.analysis_dict содержит:
+			# 1. значение карты глубины в точке
+			self.analysis_dict[i] = [disp_value[int(v[1])][int(v[0])], 
+									pointcloud[int(v[1])][int(v[0])][2]]
+		#print(f'self.analysis_dict = {self.analysis_dict}')
+
+	def correct_distance_values(self, pointcloud):
+		# Плоские квадраты(верхние грани)
+		if len(self.vertexes) == 4:
+			if self.small_diff_z_in_square():
+
+				z_list = []
+				for pcz in self.analysis_dict.items():
+					z_list.append(pcz[1][1])
+				av_z = sum(z_list) / len(z_list)
+				for v in self.vertexes:
+					pointcloud[int(v[1])][int(v[0])][2] = av_z
+
+		elif len(self.vertexes) == 6:
+
+			z_a1 = self.analysis_dict[0][1]
+			z_a2 = self.analysis_dict[1][1]
+			av_za = (z_a1+z_a2) / 2
+
+			z_c1 = self.analysis_dict[2][1]
+			z_c2 = self.analysis_dict[5][1]
+			av_zc = (z_c1+z_c2) / 2
+
+			z_b1 = self.analysis_dict[3][1]
+			z_b2 = self.analysis_dict[4][1]
+			av_zb = (z_b1+z_b2) / 2
+
+			#if av_za < av_zb:
+			pointcloud[int(self.vertexes[0][1])][int(self.vertexes[0][0])][2] = av_za
+			pointcloud[int(self.vertexes[1][1])][int(self.vertexes[1][0])][2] = av_za
+
+			pointcloud[int(self.vertexes[2][1])][int(self.vertexes[2][0])][2] = av_zc
+			pointcloud[int(self.vertexes[5][1])][int(self.vertexes[5][0])][2] = av_zc
+
+			pointcloud[int(self.vertexes[3][1])][int(self.vertexes[3][0])][2] = av_zb
+			pointcloud[int(self.vertexes[4][1])][int(self.vertexes[4][0])][2] = av_zb
+			#for pcz in self.analysis_dict.items():
 	
 	# Оставляем
 	#@timer
@@ -53,7 +113,7 @@ class Cuboid(BaseObject):
 		img_rot = cv2.warpPerspective(img, M, (cols,rows))
 		disp_crop = img_rot[pts[1][1]:pts[0][1], 
 						   pts[1][0]:pts[2][0]]
-		cv2.imwrite(f"data/croped_images/returned_box_picture{self.number+1}.jpg", disp_crop)
+		#cv2.imwrite(f"data/croped_images/returned_box_picture{self.number+1}.jpg", disp_crop)
 		return disp_crop
 
 	def test_with_vertexbox(self, params):
@@ -76,7 +136,16 @@ class Cuboid(BaseObject):
 			image_blur = cv2.medianBlur(thresh, 25)
 			_, thresh = cv2.threshold(image_blur, 240,255, cv2.THRESH_BINARY_INV)
 
-			cv2.imwrite(f'data/work_on_contour_redraw/cube_mask_{self.number}.jpg', thresh)
+			#cv2.imwrite(f'data/work_on_contour_redraw/cube_mask_{self.number}.jpg', thresh)
+
+	def correct_vertexes_with_main(self, disp_value):
+		disp0 = disp_value[self.vertexes[0][1]][self.vertexes[0][0]]
+		disp1 = disp_value[self.vertexes[1][1]][self.vertexes[1][0]]
+
+		if disp0 > disp1:
+			self.main_case = 0
+		else:
+			self.main_case = 1
 
 	def find_main_vertex(self, image):
 		
@@ -114,28 +183,14 @@ class Cuboid(BaseObject):
 		else:
 			#print(7)
 			new_vertexes.append(self.vertexes[7])
-		# for i,pt in enumerate(self.vertexes[6:]):
-		# 	aa = cv2.pointPolygonTest(big_c, tuple(pt),True)
-		# 	print(f'aa = {aa}')
-		# 	if aa == 0 or aa == 1:
-		# 		ii.append(i+6)
-		# if 6 in ii:
-		# 	print(6)
-		# 	new_vertexes.append(self.vertexes[6])
-		# elif 7 in ii:
-		# 	print(7)
-		# 	new_vertexes.append(self.vertexes[7])
+
 		self.vertexes = new_vertexes
-		#print(f'self.vertexes = {self.vertexes}')
 
 
 
 	# Функция где мы находим линию ребра
 	def find_edge_points(self, image):
 		if self.main_vertex is None:
-			#print(f"average_disparity_value: {self.average_disparity_value}")
-			#print(f"max_disparity_value: {self.max_disparity_value}")
-			#print(f"min_disparity_value : {self.min_disparity_value}")
 
 			# Найти на картинке бокса особенные точки
 			#height, width = self.Mat_image.shape[:2]
@@ -153,16 +208,7 @@ class Cuboid(BaseObject):
 				index = self.rotate_xy_from_rect_coord_system(index)
 				rotated_indexes.append(index)
 				self.draw_point(big_black_image,index, color=(255,255,255))
-			
-
-			# gray = cv2.cvtColor(black_image, cv2.COLOR_BGR2GRAY)
-			# blur = cv2.GaussianBlur(gray, (3,3), 0)
-
-			# thresh = cv2.threshold(blur, 240,255, cv2.THRESH_BINARY)[1]
-
-			# cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-			# cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-			# c = max(cnts, key=cv2.contourArea)
+				#self.draw_point(image,index, color=(255,255,255))
 
 			big_gray = cv2.cvtColor(big_black_image, cv2.COLOR_BGR2GRAY)
 			big_blur = cv2.GaussianBlur(big_gray, (3,3), 0)
@@ -186,7 +232,19 @@ class Cuboid(BaseObject):
 				if aa == 0 or aa == 1:
 					#print(f"i  = {i+4}, pointPolygonTest = {aa}")
 					ii.append(i+4)
-			if 4 in ii or 5 in ii:
+			edge45 = 0
+			edge67 = 0
+			if 4 in ii:
+				edge45 += 1
+			if 5 in ii:
+				edge45 += 1
+			if 6 in ii:
+				edge67 += 1
+			if 7 in ii:
+				edge67 += 1
+
+			#print (f"edge45 = {edge45}, edge67 = {edge67}")
+			if edge45 > edge67:
 				new_vertexes.append(self.vertexes[5])
 
 				new_vertexes.append(second_part_of_verxes[0])
@@ -194,7 +252,7 @@ class Cuboid(BaseObject):
 
 				new_vertexes.append(self.vertexes[4])
 				#print("edge_4,5")
-			elif 6 in ii or 7 in ii:
+			elif edge45 < edge67:
 				new_vertexes.append(self.vertexes[7])
 
 				new_vertexes.append(second_part_of_verxes[0])
@@ -208,85 +266,6 @@ class Cuboid(BaseObject):
 
 			self.vertexes = new_vertexes
 
-			
-
-
-			
-
-			# # Obtain outer coordinates
-			# left = tuple(c[c[:, :, 0].argmin()][0])
-			# right = tuple(c[c[:, :, 0].argmax()][0])
-			# top = tuple(c[c[:, :, 1].argmin()][0])
-			# bottom = tuple(c[c[:, :, 1].argmax()][0])
-
-			# cv2.rectangle(black_image, (left[0], top[1]), (right[0], bottom[1]), (255, 255, 255), 2)
-			
-			# self.draw_circle(black_image, left, color=(255,255,0))
-			# self.draw_circle(black_image, top, color=(255,255,0))
-			# self.draw_circle(black_image, right, color=(255,255,0))
-			# self.draw_circle(black_image, bottom, color=(255,255,0))
-			
-			# self.draw_circle(black_image, (left[0], top[1]), color=(0,255,255))
-			# self.draw_circle(black_image, (right[0], bottom[1]), color=(0,255,255))
-			# self.draw_circle(black_image, (left[0], bottom[1]), color=(0,255,255))
-			# self.draw_circle(black_image, (right[0], top[1]), color=(0,255,255))
-
-			# # coef = 5
-			# # def rectContains(rect,pt):
-			# # 	logic = rect[0]+coef < pt[0] < rect[0]+rect[2]-coef and rect[1]+coef < pt[1] < rect[1]+rect[3]-coef
-			# # 	return logic
-
-			# # rpt1 = self.rotate_xy_from_rect_coord_system([left[0], top[1]])
-			# # rpt2 = self.rotate_xy_from_rect_coord_system([right[0], bottom[1]])
-			# # rect = (rpt1[0], rpt1[1], rpt2[0], rpt2[1])
-
-			# # # self.draw_text_point(image, rpt1, "Point 1")
-			# # # self.draw_text_point(image, rpt2, "Point 2")
-
-			# # cv2.rectangle(image, (int(rpt1[0]), int(rpt1[1])), (int(rpt2[0]), int(rpt2[1])), (255, 255, 255), 2)
-
-			# # for i,pt in enumerate(self.vertexes[3:]):
-			# # 	if rectContains(rect, pt):
-			# # 		print(f"i={i}, True")
-
-			# small_width = right[0] - left[0]
-			# small_height = bottom[1] - top[1]
-
-			# #print(f'width  = {width}; height  = {height}')
-			# #print(f'small_w= {small_width}; small_h={small_height}')
-
-			# center_x = left[0] + small_width//2
-			# center_y = right[0] + small_height//2
-
-			# eps = 30
-
-			# p1,p2 = None,None
-			
-			# if (width - small_width) <= eps:
-			# 	#print ('first')
-			# 	self.draw_line(black_image, (0,center_y), (width, center_y), color=(255,255,255))
-
-			# 	p1,p2 = (0,center_y), (width, center_y)
-			
-			# elif (height - small_height) <= eps:
-			# 	#print ('second')
-			# 	self.draw_line(black_image, (center_x,0), (center_x, height), color=(255,255,255))
-
-			# 	p1,p2 = (center_x,0), (center_x, height)
-
-			# cv2.imwrite(f'data/work_on_aprox_line/cube_mask_{self.number}.jpg', black_image)
-			# cv2.imwrite(f'data/work_on_aprox_line/cube_{self.number}.jpg', self.Mat_image)
-
-			# self.edge_points = [p1,p2]
-
-			# #print(f"p1,p2 = {p1}, {p2}")
-
-			# #if not is_line_out_of_box(p1,p2, box):
-			# if (p1 != None) and (p2 != None):
-			# 	p1 = self.rotate_xy_from_rect_coord_system(p1)
-			# 	p2 = self.rotate_xy_from_rect_coord_system(p2)
-
-				#self.draw_line(image, p1, p2)
 	
 	def rebuild_points_lines(self, image):
 		pass
@@ -345,6 +324,7 @@ class Cuboid(BaseObject):
 		self.height = int(rect[1][1])
 		
 		self.lines = []
+		self.lines_dist = []
 
 		self.number = number
 		
@@ -366,9 +346,11 @@ class Cuboid(BaseObject):
 		self.isp1p2 = False
 		
 		self.edge_case = []
+		self.main_case = 0
 
 		# About point clouds
 		self.pointcloud = None
+		self.analysis_dict = {}
 
 	def add_vertexes(self, corners):
 		for i in corners:
@@ -390,13 +372,25 @@ class Cuboid(BaseObject):
 		elif len(self.vertexes) == 7:
 			for i in range(7):
 				k=i+1
-				if k==7:
+
+				if k==7 and self.main_case == 1:
 					k=1
-				# if k ==6:
-				# 	k=7
-				self.lines.append([self.vertexes[i], self.vertexes[k]])
+				elif k==7 and self.main_case == 0:
+					k=0
+
+				if k==6 and self.main_case == 0:
+					self.lines.append([self.vertexes[4], self.vertexes[k]])
+				elif k==6 and self.main_case == 1:
+					self.lines.append([self.vertexes[i], self.vertexes[k]])
+				else:
+					self.lines.append([self.vertexes[i], self.vertexes[k]])
+
 			self.lines.append([self.vertexes[0], self.vertexes[5]])
-			self.lines.append([self.vertexes[3], self.vertexes[6]])
+
+			if self.main_case == 1:
+				self.lines.append([self.vertexes[3], self.vertexes[6]])
+			else:
+				self.lines.append([self.vertexes[2], self.vertexes[6]])
 		
 		elif len(self.vertexes) == 6:
 			for i in range(6):
