@@ -25,3 +25,17 @@ options:
 m: 0 - working on pictures, 1 - working with video from stereoPiCamera
 d: 0 - depth map created by button, 1 - always
 
+
+#------
+
+# Обновленный документ
+
+1) Запуск  
+  Тестовый режим:
+  - Для тестового режима надо скачать папки [изображений](https://drive.google.com/drive/folders/1s07Tic0D12pmU0DAij_0LdIbgPd_onRS?usp=sharing) и [фонового изображения](https://drive.google.com/drive/folders/1DJMLue_h7pLnrZPJnNma6e6_aQVwIOLL?usp=sharing) и положить в папку data/  
+  - Так же в папке  data/ должны лежать калибровочные данные в папке calibration_data/ И внутри этой папки должна лежать папка с названием разрешения одной из камер . По умолчанию стоит значение 720. Слудовательно должна быть папка под названием 720p. Внутри этой папки должны быть 3 .npz файла. [Ссылка](https://drive.google.com/drive/folders/1dWrms-0M5oWDNn8TZBEo2vvf0rvj2g4q?usp=sharing) на такую папку 720p. Как их получитт будет ниже.
+  - И затем запустить приложение: python3 main.py -m 0
+  - Вы увидите следующее окно:  
+  
+  - 
+3) Калибровка 
