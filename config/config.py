@@ -7,13 +7,12 @@ class configValues(NamedTuple):
 	IMAGE_HEIGHT = 720 #1088
 	WINDOW_WIDTH = 640
 	WINDOW_HEIGHT = 362
-	folderTestScenes = './data/for_mode_zero/new_boxes/*.png'
 	
-	folderTestScenes = './data/for_mode_zero/white_fon_boxes/*.png'
+	folderTestScenes = './data/TEST_IMAGES/*.png'
 
 
 	# Для нахождения вершин
-	background_image = 'data/BACKGROUND_IMAGE/bkg4.png'
+	background_image = 'data/BACKGROUND_IMAGE/bkg1.png'
 	desck_Y1 = 327
 	desck_Y2 = 1100
 

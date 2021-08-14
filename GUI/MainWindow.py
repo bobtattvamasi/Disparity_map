@@ -44,7 +44,7 @@ class MainWindow(BaseWindow):
 			import picamera
 			from picamera import PiCamera
 
-			# Camera settimgs
+			# Настройки камеры
 			self.cam_width = cfv.PHOTO_WIDTH
 			self.cam_height = cfv.PHOTO_HEIGHT
 
@@ -79,7 +79,7 @@ class MainWindow(BaseWindow):
 		# Матрица карты несоответсвий
 		self.disparity_value = None
 
-		# Для выбора языка
+		# Для выбора языка (русский плохо выглядит)
 		#
 		# левая колонка:
 		self.settings = ('Settings', 'Настройки')
@@ -120,12 +120,12 @@ class MainWindow(BaseWindow):
 			# ~ [self.sg.Text("Radius"), self.sg.Slider(range=(0, 100), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['Radius'])],
 			# ~ [self.sg.Text("LRCthresh"), self.sg.Slider(range=(0, 300), orientation='h', size=(34, 10), default_value=self.db.mWinParameters['LRCthresh'])],
 			# sg.Combo(['eng', 'rus'], enable_events=True, key='combo'),
-			[self.sg.Button(self.save_settings[self.language], size=(10,1))]
+			[self.sg.Button(self.save_settings[self.language], size=(10,1))]  #  Кнопка сохранения настроек
 			])],
 			
 			[self.sg.Frame(self.FindClear[self.language],[
 			# Кнопка по которой вычисляются размеры найденных граней
-			[self.sg.Button(self.find_distances[self.language], size=(15,2)),
+			[self.sg.Button(self.find_distances[self.language], size=(15,2)), 
 			# Кнопка котороя delete lines
 			self.sg.Button(self.clear_lines[self.language], size=(15,2))]
 			])],
@@ -134,7 +134,7 @@ class MainWindow(BaseWindow):
 		]
 
 		if not self.ifCamPi:
-			left_column.append([self.sg.Button(self.Next_Picture[self.language], size=(15,2))])
+			left_column.append([self.sg.Button(self.Next_Picture[self.language], size=(15,2))])   #  Кнопка для перелистывания следующего изображения
 
 		# Правая колонка:
 		#
@@ -155,7 +155,7 @@ class MainWindow(BaseWindow):
 			# Группируем кнопки
 			[self.sg.Frame(self.lineFind3D_Settings[self.language],[
 			# Кнопка для настройки автонахождения линий
-			[#self.sg.Button(self.lineFinder_Settings[self.language], size=(15,2)), 
+			[self.sg.Button(self.lineFinder_Settings[self.language], size=(15,2)), 
 			self.sg.Button(self.D3Cloud_Settings[self.language], size=(15,2))]
 			])],
 			# Кнопка для автонахождения линий на картинке
@@ -227,7 +227,7 @@ class MainWindow(BaseWindow):
 
 				# Update image in window
 				imageL,ImageR = resize_rectified_pair(rectified_pair)
-				self.window.FindElement('image').Update(data=cv2.imencode('.png', imageL)[1].tobytes())
+				self.window['image'].Update(data=cv2.imencode('.png', imageL)[1].tobytes())
 
 
 				#----------------------
@@ -246,7 +246,7 @@ class MainWindow(BaseWindow):
 
 				# Найти и определить контуры объектов
 				if event == self.auto_lineFinder[self.language]:
-					self.window.FindElement("_output_").Update('')
+					self.window["_output_"].Update('')
 					try:
 						self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
 						self.disparity_value = self.autoFinderWindow.disparity_value
@@ -261,7 +261,7 @@ class MainWindow(BaseWindow):
 					try:
 						self.Window3D.run(self.disparity,self.disparity_value, self.ifCamPi)
 					except:
-						self.window.FindElement("_output_").Update('')
+						self.window["_output_"].Update('')
 						print("ERROR:Firstly create disparity map!")
 						print(traceback.format_exc()) 
 				
@@ -277,10 +277,10 @@ class MainWindow(BaseWindow):
 						self.autoFinderWindow.auto_lines = []
 						self.disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 						self.graph.TKCanvas.delete('all')
-						self.window.FindElement("_output_").Update('')
+						self.window["_output_"].Update('')
 						print("All lines is deleted.")
 					except:
-						self.window.FindElement("_output_").Update('')
+						self.window["_output_"].Update('')
 						print("ERROR:Something wrong with 'clear lines'")
 
 				# Open window with lineFinder settings
@@ -290,7 +290,7 @@ class MainWindow(BaseWindow):
 						self.disparity, value_disparity = self.deepMap_updater(imageToDisp, values)
 						self.autoFinderWindow.run(self.disparity)
 					except:
-						self.window.FindElement("_output_").Update('')
+						self.window["_output_"].Update('')
 						print("ERROR:Firstly create disparity map!")
 						print(traceback.format_exc()) 
 
@@ -335,7 +335,7 @@ class MainWindow(BaseWindow):
 					self.disparity, self.autoFinderWindow.disparity_value = self.deepMap_updater(imageToDisp, values)
 					self.disparity_value = self.autoFinderWindow.disparity_value
 					self.Window3D.updatePointCloud(self.disparity,self.disparity_value, self.ifCamPi)
-					#self.window.FindElement("_output_").Update('')
+					#self.window["_output_"].Update('')
 					print("Deep map is created.")
 
 				# Нажатие на кнопку "Вычислить", которая должна вернуть 
@@ -372,10 +372,10 @@ class MainWindow(BaseWindow):
 	def findAllDistances(self) -> None:
 		# Проверяем есть ли линии
 		if len(self.lines) == 0 and len(self.autoFinderWindow.auto_lines) == 0:
-			self.window.FindElement("_output_").Update('')
+			self.window["_output_"].Update('')
 			print("No lines that I can find.")
 		else:
-			self.window.FindElement("_output_").Update('')
+			self.window["_output_"].Update('')
 
 			# Отрисовываем линии найденные автоопределителем 
 			mul_coef = 1

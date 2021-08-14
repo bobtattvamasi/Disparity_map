@@ -93,9 +93,9 @@ class PointCloudWindow(BaseWindow):
 				os.system("meshlab output.ply")
 
 
-			window.FindElement('Image').Update(data=cv2.imencode('.png', imgLtoShow)[1].tobytes())
-			window.FindElement('ProjectedPicture').Update(data=cv2.imencode('.png', projected_image_toshow)[1].tobytes())	
-			window.FindElement('DisparityPicture').Update(data=cv2.imencode('.png', disparity_to_show)[1].tobytes())
+			window['Image'].Update(data=cv2.imencode('.png', imgLtoShow)[1].tobytes())
+			window['ProjectedPicture'].Update(data=cv2.imencode('.png', projected_image_toshow)[1].tobytes())	
+			window['DisparityPicture'].Update(data=cv2.imencode('.png', disparity_to_show)[1].tobytes())
 
 		window.close()
 
@@ -137,7 +137,7 @@ class PointCloudWindow(BaseWindow):
 		dist_coeff = np.zeros((4, 1))
 
 		# Сохраняем облако точек в файл
-		self.__write_ply("output.ply", points_3, colors)
+		self.__write_ply("output_good.ply", points_3, colors)
 		
 		projected_image = calc_projected_image(points_3, colors, r, t, self.right_K, dist_coeff, map_width, map_height)
 		projected_image_toshow = cv2.resize (projected_image, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)

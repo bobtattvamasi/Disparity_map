@@ -136,10 +136,10 @@ class StereoDepthMap:
 		#disparity_value = a_tricky_filter(disparity_value)
 		#disparity_value = filtering_box(disparity_value)
 
-		# Находим количество файлов в папке и сохраняем нашу карту глубин
-		path = 'data/good_depth_maps'
-		num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
-		cv2.imwrite(path + f'/map_{num_files+1}.jpg', disparity_color)
+		# Находим количество файлов в папке и сохраняем нашу карту глубин (внимание! Для работы убедитесь что папка data/good_depth_maps существует)
+		# path = 'data/good_depth_maps'
+		# num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
+		# cv2.imwrite(path + f'/map_{num_files+1}.jpg', disparity_color)
 
 
 		return disparity_color, disparity_value #disparity.astype(np.float32) / 16.0
@@ -288,179 +288,180 @@ def autoFindRect(image, hsv_frame, self_, ifPrintRect=False):
 	# потому что, мы начинаем их сначала искать
 	self_.auto_lines = []
 
-	pointcloud = self_.Window3D.pointcloud
+	if ifPrintRect:
+		pointcloud = self_.Window3D.pointcloud
 
-	# Вводим список для хранения 
-	# найденных кубоидов
-	cubes = []
+		# Вводим список для хранения 
+		# найденных кубоидов
+		cubes = []
 
-	# Метод поиска вершины из VertexFinder
-	corners,_,nvxt = self_.VertexFinder.find_corners(self_.left_image)
-	#self_.VertexFinder.draw_corners(image,_,corners)
-	number_of_vertexes = self_.VertexFinder.return_number_of_vertexes(corners)
+		# Метод поиска вершины из VertexFinder
+		corners,_,nvxt = self_.VertexFinder.find_corners(self_.left_image)
+		#self_.VertexFinder.draw_corners(image,_,corners)
+		number_of_vertexes = self_.VertexFinder.return_number_of_vertexes(corners)
 
 
-	for i,c in enumerate(cnts):
+		for i,c in enumerate(cnts):
 
-		# Находится площадь контура 
-		contour_area = cv2.contourArea(c)
-		# Отсеиваем если слишком маленькие площади
-		if contour_area < 150:
-			continue
-		# Находим периметр контура и опять же отсеиваем слишком маленькие	
-		peri = cv2.arcLength(c, True)
-		if peri < 300:
-			continue
+			# Находится площадь контура 
+			contour_area = cv2.contourArea(c)
+			# Отсеиваем если слишком маленькие площади
+			if contour_area < 150:
+				continue
+			# Находим периметр контура и опять же отсеиваем слишком маленькие	
+			peri = cv2.arcLength(c, True)
+			if peri < 300:
+				continue
 
-		is_in_contour = -1
-		index_corner = 0
+			is_in_contour = -1
+			index_corner = 0
 
-		# Проверяем, есть ли хотя бы одна вершина внутри нашего найденного по карте глубин кубе
-		for ind,corn in enumerate(corners):
-			for k in corn.keys():
-				pt = corn[k][0]
-				ptt = [pt[0][0]+configValues.desck_Y1, pt[0][1]]
-				#print(f'ptt = {ptt}')
-				is_in_contour = cv2.pointPolygonTest(c, tuple(ptt),False)
+			# Проверяем, есть ли хотя бы одна вершина внутри нашего найденного по карте глубин кубе
+			for ind,corn in enumerate(corners):
+				for k in corn.keys():
+					pt = corn[k][0]
+					ptt = [pt[0][0]+configValues.desck_Y1, pt[0][1]]
+					#print(f'ptt = {ptt}')
+					is_in_contour = cv2.pointPolygonTest(c, tuple(ptt),False)
+					if is_in_contour == 1 or is_in_contour == 0:
+						index_corner = ind
+						break
 				if is_in_contour == 1 or is_in_contour == 0:
 					index_corner = ind
 					break
+
+			# Считаются центры масс контуров, затем детектируется имя формы, используя только контор
+			M = cv2.moments(c)
+			if M["m00"] != 0:
+				cX = int((M["m10"] / M["m00"]))
+				cY = int((M["m01"] / M["m00"]))
+
+			# Фильтр на игнор правой части изображения
+			if cX > 1200:
+				continue
+
+			# multiply the contour (x, y)-coordinates by the resize ratio,
+			# then draw the contours and the name of the shape on the image
+			c = c.astype("float")
+			c = c.astype("int")
+
+			# Аппроксимируем контуры в линии
+			c = cv2.approxPolyDP(c, 0.020 * peri, True)
+
+			# Создаем прямоугольник под углом через контур
+			rect = cv2.minAreaRect(c)
+
+			disp = self_.disparity_value
+			# Заполняем массив кубоидами по прямоугольникам
+			cubes.append(Cuboid(image, disp, rect,j))
+			
+			
+			#------ Здесь происходит поиск ключевых объектов внутри найденных предметов
 			if is_in_contour == 1 or is_in_contour == 0:
-				index_corner = ind
-				break
+				#print(number_of_vertexes[index_corner])
 
-		# Считаются центры масс контуров, затем детектируется имя формы, используя только контор
-		M = cv2.moments(c)
-		if M["m00"] != 0:
-			cX = int((M["m10"] / M["m00"]))
-			cY = int((M["m01"] / M["m00"]))
-
-		# Фильтр на игнор правой части изображения
-		if cX > 1200:
-			continue
-
-		# multiply the contour (x, y)-coordinates by the resize ratio,
-		# then draw the contours and the name of the shape on the image
-		c = c.astype("float")
-		c = c.astype("int")
-
-		# Аппроксимируем контуры в линии
-		c = cv2.approxPolyDP(c, 0.020 * peri, True)
-
-		# Создаем прямоугольник под углом через контур
-		rect = cv2.minAreaRect(c)
-
-		disp = self_.disparity_value
-		# Заполняем массив кубоидами по прямоугольникам
-		cubes.append(Cuboid(image, disp, rect,j))
-		
-		
-		#------ Здесь происходит поиск ключевых объектов внутри найденных предметов
-		if is_in_contour == 1 or is_in_contour == 0:
-			#print(number_of_vertexes[index_corner])
-
-			# Добавляем все найденные вершины если не 4 вершины
-			cubes[j].add_vertexes([corners[index_corner]])
-			# Если четыре и нет внутри других вершин, то берем только 4
-			if number_of_vertexes[index_corner] == 4:
-				cubes[j].add_four_vertexes()
-			
-			
-			# Количество углов у контура
-			n = nvxt[index_corner]
-
-			# Для кубов с ребром кверху
-			if n == 4 and number_of_vertexes[index_corner] != 4:
-				#cubes[j].rebuild_points_lines(image)
-				cubes[j].find_edge_points(image)
-			# Для кубов вершиной кверху
-			elif n == 6:
-				cubes[j].find_main_vertex(image)
-				cubes[j].correct_vertexes_with_main(disp)
-
-			# Анализируем расстояния
-			cubes[j].analysis_distance(disp, pointcloud)
-			cubes[j].correct_distance_values(pointcloud)
-			
-			cubes[j].add_lines()
-			cubes[j].draw_vertexes(image)
-			cubes[j].draw_all_lines(image)
-			
-			
-		#else:
-			#continue
-			# Нахожу лишь одну вершину
-			#cubes[j].find_only_one_vertex(image, disp)
-			#cubes[j].find_edge_points(image)
-			# cubes[j].create_lines()
-			# cubes[j].draw_all_lines(image)
-
-			# self_.disparity_value = cubes[j].find_vertex(image, disp)
-
-
-		# Играемся с перерисовыванием контуров внутри бокса
-		#cubes[j].test_with_vertexbox(self_.db.aDRWinParameters)
-
-		# cubes[j].fill_crop_test(image, self_.disparity_value)
-		#------ 
-
-		box = np.int0(cv2.boxPoints(rect))
-		#print(f'box = {box}')
-		#-------------------------
-		if ifPrintRect:
-			print(f"object {j+1}:")
-
-		
-
-
-
-		# Для того, что бы отобразить размеры всех линий
-		for k in range(len(cubes[j].lines)):
-			cubes[j].lines_dist.append(round(self_.determine_line( [ [int(cubes[j].lines[k][0][0]),int(cubes[j].lines[k][0][1])],[int(cubes[j].lines[k][1][0]),int(cubes[j].lines[k][1][1])] ] ), 2))
-
-			cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),
-									int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2 ) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-			fontScale=1, color=(255,255,255), thickness = 3)
-
-		cubes[j].lines_dist = analys_lines(cubes[j].lines_dist)
-		
-		for k in range(len(cubes[j].lines)):	
-			if ifPrintRect:
-				print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {cubes[j].lines_dist[k]} mm")
-		
-		# # Линии отображаются только по 4м сторонам
-		# else:
-		# for k in range(len(cubes[j].lines)):
-		# 	cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-		# 	fontScale=1, color=(255,255,255), thickness = 3)
-			
-		# 	if ifPrintRect:
-		# 		#cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
-		# 		#cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
+				# Добавляем все найденные вершины если не 4 вершины
+				cubes[j].add_vertexes([corners[index_corner]])
+				# Если четыре и нет внутри других вершин, то берем только 4
+				if number_of_vertexes[index_corner] == 4:
+					cubes[j].add_four_vertexes()
 				
-		# 		self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
-		# 		print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
+				
+				# Количество углов у контура
+				n = nvxt[index_corner]
+
+				# Для кубов с ребром кверху
+				if n == 4 and number_of_vertexes[index_corner] != 4:
+					#cubes[j].rebuild_points_lines(image)
+					cubes[j].find_edge_points(image)
+				# Для кубов вершиной кверху
+				elif n == 6:
+					cubes[j].find_main_vertex(image)
+					cubes[j].correct_vertexes_with_main(disp)
+
+				# Анализируем расстояния
+				cubes[j].analysis_distance(disp, pointcloud)
+				cubes[j].correct_distance_values(pointcloud)
+				
+				cubes[j].add_lines()
+				cubes[j].draw_vertexes(image)
+				cubes[j].draw_all_lines(image)
+				
+				
+			#else:
+				#continue
+				# Нахожу лишь одну вершину
+				#cubes[j].find_only_one_vertex(image, disp)
+				#cubes[j].find_edge_points(image)
+				# cubes[j].create_lines()
+				# cubes[j].draw_all_lines(image)
+
+				# self_.disparity_value = cubes[j].find_vertex(image, disp)
+
+
+			# Играемся с перерисовыванием контуров внутри бокса
+			#cubes[j].test_with_vertexbox(self_.db.aDRWinParameters)
+
+			# cubes[j].fill_crop_test(image, self_.disparity_value)
+			#------ 
+
+			box = np.int0(cv2.boxPoints(rect))
+			#print(f'box = {box}')
+			#-------------------------
+			if ifPrintRect:
+				print(f"object {j+1}:")
+
 		
 
-		if not ifPrintRect:
 
-			self_.auto_lines.append([box[0],box[1]])
-			self_.auto_lines.append([box[1],box[2]])
-			self_.auto_lines.append([box[2],box[3]])
-			self_.auto_lines.append([box[3],box[0]])
+
+			# Для того, что бы отобразить размеры всех линий
+			for k in range(len(cubes[j].lines)):
+				cubes[j].lines_dist.append(round(self_.determine_line( [ [int(cubes[j].lines[k][0][0]),int(cubes[j].lines[k][0][1])],[int(cubes[j].lines[k][1][0]),int(cubes[j].lines[k][1][1])] ] ), 2))
+
+				cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),
+										int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2 ) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+				fontScale=1, color=(255,255,255), thickness = 3)
+
+			cubes[j].lines_dist = analys_lines(cubes[j].lines_dist)
+			
+			for k in range(len(cubes[j].lines)):	
+				if ifPrintRect:
+					print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {cubes[j].lines_dist[k]} mm")
+			
+			# # Линии отображаются только по 4м сторонам
+			# else:
+			# for k in range(len(cubes[j].lines)):
+			# 	cv2.putText(image, str(self_.letter_dict[j]*mul_coef)+str(k+1), (int(cubes[j].lines[k][0][0] + (cubes[j].lines[k][1][0] - cubes[j].lines[k][0][0])/2),int(cubes[j].lines[k][0][1] + (cubes[j].lines[k][1][1] - cubes[j].lines[k][0][1])/2) ), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+			# 	fontScale=1, color=(255,255,255), thickness = 3)
+				
+			# 	if ifPrintRect:
+			# 		#cubes[j].lines[k][0] = np.array(cubes[j].lines[k][0])
+			# 		#cubes[j].lines[k][1] = np.array(cubes[j].lines[k][1])
+					
+			# 		self_.autoFinderWindow.auto_lines.append([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])])
+			# 		print(f"{self_.letter_dict[j]*mul_coef}{k+1} : {round(self_.determine_line([np.array(cubes[j].lines[k][0]),np.array(cubes[j].lines[k][1])]), 2)} mm")
+			
+
+			if not ifPrintRect:
+
+				self_.auto_lines.append([box[0],box[1]])
+				self_.auto_lines.append([box[1],box[2]])
+				self_.auto_lines.append([box[2],box[3]])
+				self_.auto_lines.append([box[3],box[0]])
+			
+
+			# if not cubes[j].isp1p2:
+			# 	image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
+
+			j=j+1
+			if self_.letter_dict[j] == 'Z':
+				j=0
+				mul_coef = mul_coef + 1
 		
-
-		# if not cubes[j].isp1p2:
-		# 	image = cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
-
-		j=j+1
-		if self_.letter_dict[j] == 'Z':
-			j=0
-			mul_coef = mul_coef + 1
-	
-	path = 'data/test_results'
-	num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
-	cv2.imwrite(path + f'/map_{num_files+1}.jpg', image)
+		path = 'data/test_results'
+		num_files = sum(os.path.isfile(os.path.join(path, f)) for f in os.listdir(path))
+		cv2.imwrite(path + f'/map_{num_files+1}.jpg', image)
 
 	return mask_frame, thresh
 

@@ -75,11 +75,11 @@ class AutoDetectRectWindow(BaseWindow):
 			mask_frame_to_show = cv2.resize(mask_frame, dsize=(cfv.WINDOW_WIDTH, cfv.WINDOW_HEIGHT), interpolation = cv2.INTER_CUBIC)
 
 			
-			window.FindElement('cube_image').Update(data=cv2.imencode('.png', image_to_show)[1].tobytes())
+			window['cube_image'].Update(data=cv2.imencode('.png', image_to_show)[1].tobytes())
 			# Результат действия наложения цветовой маски (Правое верхнее изображение)
-			window.FindElement('mask_contor_image').Update(data=cv2.imencode('.png', thresh_to_show)[1].tobytes())
+			window['mask_contor_image'].Update(data=cv2.imencode('.png', thresh_to_show)[1].tobytes())
 			#
-			window.FindElement('hsv_image').Update(data=cv2.imencode('.png', mask_frame_to_show)[1].tobytes())
+			window['hsv_image'].Update(data=cv2.imencode('.png', mask_frame_to_show)[1].tobytes())
 
 		window.close()
 
